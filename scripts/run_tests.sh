@@ -24,4 +24,4 @@ done
 #    pycodestyle src tests conftest.py
 #fi
 
-python -m pytest "${pytest_args[@]}" -rf tests -s
+python -m pytest --log-cli-level DEBUG --log-cli-format "[%(asctime)s.%(msecs)s][%(name)s][%(funcName)s]: %(message)s" "${pytest_args[@]}" -rf tests -s
