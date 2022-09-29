@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from dataclasses import dataclass
 
 import pytest
 
@@ -20,7 +21,7 @@ class ProtocolInterceptor(asyncio.Protocol):
         # When a connection is made we patch the "close" method of the
         # transport to intercept calls to it
 
-        logger.info("begin")
+        logger.debug("begin")
         self.transport = transport
         self.transport_close_patcher = self.mocker.patch.object(
             self.transport, "close", self.transport_close
@@ -30,34 +31,98 @@ class ProtocolInterceptor(asyncio.Protocol):
     def transport_close(self):
         # Stop the patch to avoid infinite recursion back to this method
         # when we call 'transport.close()' just below
-        logger.info("begin")
+        logger.debug("begin")
         self.transport_close_patcher.stop()
         self.transport.close()
-        logger.info("end")
+        logger.debug("end")
 
     def connection_lost(self, exc):
-        logger.info("begin: exc=%s", exc)
+        logger.debug("begin: exc=%s", exc)
         self.original_protocol.connection_lost(exc)
 
     def data_received(self, data):
-        logger.info("begin: data=%s", data)
+        logger.debug("begin: data=%s", data)
         self.original_protocol.data_received(data)
 
     def eof_received(self):
-        logger.info("begin")
+        logger.debug("begin")
         self.original_protocol.eof_received()
 
-    # wait_closed is not part of the asyncio.Protocol interface but
-    # we _do_ expect it to be on the Protocol implementations what we
-    # use
-    async def wait_closed(self):
-        logger.info("begin")
-        await self.original_protocol.wait_closed()
-        self.whiteboard.wait_closed_called = True
+    # # wait_closed is not part of the asyncio.Protocol interface but
+    # # we _do_ expect it to be on the Protocol implementations what we
+    # # use
+    # async def wait_closed(self):
+    #     logger.debug("begin")
+    #     await self.original_protocol.wait_closed()
+    #     self.whiteboard.wait_closed_called = True
 
-    # Everything else just gets passed through
-    def __getattr__(self, key):
-        return getattr(self.original_protocol, key)
+    # # Everything else just gets passed through
+    # def __getattr__(self, key):
+    #     return getattr(self.original_protocol, key)
+
+
+@dataclass
+class ClientConnected:
+    pass
+
+
+class ExpectConnect:
+
+    def __init__(self, server, timeout):
+        self.server = server
+        self.timeout = timeout
+
+    def __str__(self):
+        return "ExpectConnect()"
+
+    async def __call__(self):
+        try:
+            next_event = await asyncio.wait_for(
+                self.server.client_connected.acquire(),
+                timeout=self.timeout,
+            )
+            logger.debug("Connection made")
+        except asyncio.TimeoutError:
+            logger.debug("Timed out")
+            return f"Timed out waiting for connection"
+
+
+class ExpectBytes:
+
+    def __init__(self, server, expected_bytes):
+        self.server = server
+        self.expected_bytes = expected_bytes
+
+    def __str__(self):
+        return f"ExpectBytes(server={self.server}, expected_bytes={self.expected_bytes})"
+
+    async def __call__(self):
+        try:
+            received = await asyncio.wait_for(
+                self.server.reader.readexactly(len(self.expected_bytes)),
+                timeout=0.1
+            )
+            logger.debug("Read data succesfully")
+        except asyncio.TimeoutError:
+            return f"Timed out waiting for {self.expected_bytes}"
+        if received == self.expected_bytes:
+            logger.debug("Got expected bytes")
+            return None
+        logger.debug("Did not get expected bytes")
+        return f"Expected {self.expected_bytes} but got {received}"
+
+
+class SendBytes:
+
+    def __init__(self, server, message):
+        self.server = server
+        self.message = message
+
+    def __str__(self):
+        return f"ExpectBytes(server={self.server}, message={self.message})"
+
+    async def __call__(self):
+        self.server.writer.write(self.message)
 
 
 class MockTcpServer:
@@ -67,32 +132,39 @@ class MockTcpServer:
         self.service_port = service_port
         self.connected = False
         self.errors = []
+        self.stopped = False
+        self.instructions = []
+        self.client_connected = asyncio.Semaphore(0)
+        self.unsatisfied_expectations = asyncio.Queue()
+        self.completed_expectations = asyncio.Queue()
+        self.outstanding_expectation_count = 0
 
         self.open_connection_original = asyncio.open_connection
-        self.open_connection_patcher = mocker.patch(
+        mocker.patch(
             "asyncio.open_connection",
             self.open_connection,
         )
 
         self.create_connection_original = asyncio.get_event_loop().create_connection
-        self.create_connection_patcher = mocker.patch.object(
+        mocker.patch.object(
             asyncio.get_event_loop(), "create_connection",
             self.create_connection,
         )
 
-        self.task = asyncio.create_task(self.start())
-        logger.info("self.task=%s", self.task)
+        # self.task = asyncio.create_task(self.start())
+        self.server = None
+        self.reader = None
+        self.writer = None
 
     async def open_connection(self, host, port):
-        logger.info("enter: host=%s, port=%s", host, port)
         reader, writer = await self.open_connection_original(host, port)
-        self.check_for_errors()
+        await self.join()
         return reader, writer
 
     async def create_connection(
         self, protocol_factory, host=None, port=None, *args, **kwargs
     ):
-        logger.info("enter: protocol_factory=%s, host=%s, port=%s", protocol_factory, host, port)
+        logger.debug("enter")
         protocol_interceptor = ProtocolInterceptor(
             self.mocker,
             protocol_factory()
@@ -101,13 +173,8 @@ class MockTcpServer:
             lambda: protocol_interceptor,
             host, port, *args, **kwargs
         )
+        logger.debug("exit")
         return transport, protocol
-
-    async def stop(self):
-        logger.info("entering")
-        self.task.cancel()
-        await self.task
-        self.check_for_errors()
 
     def check_for_errors(self):
         # If we get errors, we have to clear `self.errors`.
@@ -123,35 +190,111 @@ class MockTcpServer:
             self.errors.clear()
             raise error
         elif len(self.errors) > 1:
+            msg = ",".join(str(e) for e in self.errors)
             self.errors.clear()
-            raise Exception("Multiple errors")
+            raise Exception(msg)
 
     async def start(self):
-        logger.info("enter: self.service_port=%s", self.service_port)
-        try:
-            server = await asyncio.start_server(
-                self.client_handler,
-                port=self.service_port,
-                start_serving=False,
-            )
-            async with server:
-                while not self.errors:
-                    await server.start_serving()
-        except asyncio.CancelledError:
-            pass
+        logger.debug("enter: current_task=%s", asyncio.current_task())
+        self.server = await asyncio.start_server(
+            self.handle_client_connection,
+            port=self.service_port,
+            start_serving=True,
+        )
+        self.evaluator_task = asyncio.create_task(self.evaluate_expectations())
 
-    def client_handler(self, reader, writer):
-        logger.info("entering")
-        if self.connected:
-            self.error(Exception("Client is already connected"))
-        self.connected = True
+    def handle_client_connection(self, reader, writer):
+        logger.debug("enter: current_task=%s", asyncio.current_task())
+        try:
+            if self.connected:
+                raise Exception("Client is already connected")
+            self.connected = True
+            self.reader = reader
+            self.writer = writer
+            self.client_connected.release()
+        except Exception as e:
+            self.error(e)
+
+    async def evaluate_expectations(self):
+        while not self.stopped and not self.errors:
+            await self.evaluate_next_expectation()
+
+    async def evaluate_next_expectation(self):
+        logger.debug("enter: current_task=%s", asyncio.current_task())
+        expectation = await self.unsatisfied_expectations.get()
+        logger.debug("expectation: %s", expectation)
+        logger.debug("evaluating expectation")
+        try:
+            result = await expectation()
+        except Exception as e:
+            logger.exception("Exception evaluating expectation")
+            raise
+        logger.debug("expectation completed")
+        if result is not None:
+            self.error(Exception(result))
+        self.completed_expectations.put_nowait(expectation)
+        logger.debug("exit")
 
     def error(self, exception):
         self.errors.append(exception)
+
+    async def stop(self):
+        self.stopped = True
+        try:
+            await self.join()
+        finally:
+
+            self.evaluator_task.cancel()
+            try:
+                await self.evaluator_task
+            except asyncio.CancelledError:
+                pass
+
+            self.server.close()
+            await self.server.wait_closed()
+
+    async def join(self):
+
+        # Have to check for errors here because not all errors are caused by
+        # unment expecations. Therefore, its possible for `outstanding_expectation_count` to
+        # be 0 when `join` is called, which means that the body of the loop below will not
+        # be executed.
+        self.check_for_errors()
+
+        # While there are still outstanding expecations, wait for each of them to
+        # be completed and then check for errors.
+        while self.outstanding_expectation_count:
+            await self.completed_expectations.get()
+            self.outstanding_expectation_count -= 1
+            # May raise exception and exit loop prematurely
+            self.check_for_errors()
+
+    def check_not_stopped(self):
+        if self.stopped:
+            raise Exception("Fixture is stopped")
+
+    def add_expectation(self, expectation):
+        self.unsatisfied_expectations.put_nowait(expectation)
+        self.outstanding_expectation_count += 1
+
+    def expect_connect(self, timeout=5):
+        self.check_not_stopped()
+        self.add_expectation(ExpectConnect(self, timeout=timeout))
+
+    def expect_bytes(self, expected_bytes):
+        self.check_not_stopped()
+        self.add_expectation(ExpectBytes(self, expected_bytes))
+
+    def send_bytes(self, message):
+        self.check_not_stopped()
+        self.add_expectation(SendBytes(self, message))
 
 
 @pytest.fixture
 async def tcpserver(mocker, unused_tcp_port):
     fixture = MockTcpServer(mocker, unused_tcp_port)
+    logger.info("enter: current_task=%s", asyncio.current_task())
+    await fixture.start()
     yield fixture
+    await fixture.join()
     await fixture.stop()
