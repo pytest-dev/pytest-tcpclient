@@ -15,7 +15,7 @@ refresh_venv: .make/venv_refreshed
 
 .PHONY: test
 test: | refresh_venv
-	scripts/run_tests.sh
+	scripts/run_tests.sh --log-cli-level INFO --log-cli-format "[%(asctime)s.%(msecs)s][%(name)s][%(funcName)s]: %(message)s"
 
 .PHONY: distclean
 distclean:

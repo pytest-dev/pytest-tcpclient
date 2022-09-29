@@ -65,6 +65,8 @@ class MockTcpServer:
     def __init__(self, mocker, service_port):
         self.mocker = mocker
         self.service_port = service_port
+        self.connected = False
+        self.errors = []
 
         self.open_connection_original = asyncio.open_connection
         self.open_connection_patcher = mocker.patch(
@@ -84,6 +86,7 @@ class MockTcpServer:
     async def open_connection(self, host, port):
         logger.info("enter: host=%s, port=%s", host, port)
         reader, writer = await self.open_connection_original(host, port)
+        self.check_for_errors()
         return reader, writer
 
     async def create_connection(
@@ -100,29 +103,55 @@ class MockTcpServer:
         )
         return transport, protocol
 
-    # async def stop(self):
-    #     logger.info("entering")
-    #     # self.task.cancel()
-    #     # await self.task
+    async def stop(self):
+        logger.info("entering")
+        self.task.cancel()
+        await self.task
+        self.check_for_errors()
+
+    def check_for_errors(self):
+        # If we get errors, we have to clear `self.errors`.
+        # If we don't do this, can `check_for_errors` has been called from somewhere
+        # other than the call to `fixture.stop()` in the `tcpserver` fixture below,
+        # then that call will be invoked as part of the clean up of the fixture. In that
+        # case, the clean up code is being invoked _during_ the stack unwind due to
+        # the exception raised below. Since `stop` invokes `check_for_errors`, it would
+        # raise yet another exception if `self.errors` were not empty. There is no
+        # need for that second exception because we've already raised one.
+        if len(self.errors) == 1:
+            error = self.errors[0]
+            self.errors.clear()
+            raise error
+        elif len(self.errors) > 1:
+            self.errors.clear()
+            raise Exception("Multiple errors")
 
     async def start(self):
         logger.info("enter: self.service_port=%s", self.service_port)
-        # try:
-        server = await asyncio.start_server(
-            self.client_handler,
-            port=self.service_port,
-            start_serving=True,
-        )
-        # except asyncio.CancelledError:
-        #     pass
+        try:
+            server = await asyncio.start_server(
+                self.client_handler,
+                port=self.service_port,
+                start_serving=False,
+            )
+            async with server:
+                while not self.errors:
+                    await server.start_serving()
+        except asyncio.CancelledError:
+            pass
 
     def client_handler(self, reader, writer):
         logger.info("entering")
+        if self.connected:
+            self.error(Exception("Client is already connected"))
+        self.connected = True
+
+    def error(self, exception):
+        self.errors.append(exception)
 
 
 @pytest.fixture
 async def tcpserver(mocker, unused_tcp_port):
-    return MockTcpServer(mocker, unused_tcp_port)
-    # fixture = MockTcpServer(mocker, unused_tcp_port)
-    # yield fixture
-    # # await fixture.stop()
+    fixture = MockTcpServer(mocker, unused_tcp_port)
+    yield fixture
+    await fixture.stop()
