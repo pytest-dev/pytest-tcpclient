@@ -9,4 +9,4 @@ import asyncio
 async def test(tcpserver):
     assert isinstance(tcpserver, MockTcpServer)
     # await asyncio.open_connection("localhost", 1000)
-    await asyncio.open_connection("localhost", tcpserver.service_port)
+    await asyncio.open_connection(None, tcpserver.service_port)

@@ -22,11 +22,10 @@ class ProtocolInterceptor(asyncio.Protocol):
 
         logger.info("begin")
         self.transport = transport
-        self.transport_close_patcher = mocker.patch.object(
+        self.transport_close_patcher = self.mocker.patch.object(
             self.transport, "close", self.transport_close
         )
         self.original_protocol.connection_made(transport)
-        self.transport_close_patcher.start()
 
     def transport_close(self):
         # Stop the patch to avoid infinite recursion back to this method
@@ -64,68 +63,58 @@ class ProtocolInterceptor(asyncio.Protocol):
 class MockTcpServer:
 
     def __init__(self, mocker, service_port):
-        # self.mocker = mocker
+        self.mocker = mocker
         self.service_port = service_port
 
-        # self.open_connection_original = asyncio.open_connection
-        # self.open_connection_patcher = mocker.patch(
-        #     "asyncio.open_connection",
-        #     self.open_connection,
-        # )
+        self.open_connection_original = asyncio.open_connection
+        self.open_connection_patcher = mocker.patch(
+            "asyncio.open_connection",
+            self.open_connection,
+        )
 
-        # self.create_connection_original = asyncio.get_event_loop().create_connection
-        # self.create_connection_patcher = mocker.patch.object(
-        #     asyncio.get_event_loop(), "create_connection",
-        #     self.create_connection,
-        # )
-        pass
+        self.create_connection_original = asyncio.get_event_loop().create_connection
+        self.create_connection_patcher = mocker.patch.object(
+            asyncio.get_event_loop(), "create_connection",
+            self.create_connection,
+        )
 
         self.task = asyncio.create_task(self.start())
         logger.info("self.task=%s", self.task)
 
-    # async def open_connection(self, host, port):
-    #     logger.info("enter: host=%s, port=%s", host, port)
-    #     reader, writer = await self.open_connection_original(host, port)
-    #     return reader, writer
+    async def open_connection(self, host, port):
+        logger.info("enter: host=%s, port=%s", host, port)
+        reader, writer = await self.open_connection_original(host, port)
+        return reader, writer
 
-    # async def create_connection(
-    #     self, protocol_factory, host=None, port=None, *args, **kwargs
-    # ):
-    #     logger.info("enter: protocol_factory=%s, host=%s, port=%s", protocol_factory, host, port)
-    #     protocol_interceptor = ProtocolInterceptor(
-    #         self.mocker,
-    #         protocol_factory()
-    #     )
-    #     transport, protocol = await self.create_connection_original(
-    #         lambda: protocol_interceptor,
-    #         host, port, *args, **kwargs
-    #     )
-    #     return transport, protocol
+    async def create_connection(
+        self, protocol_factory, host=None, port=None, *args, **kwargs
+    ):
+        logger.info("enter: protocol_factory=%s, host=%s, port=%s", protocol_factory, host, port)
+        protocol_interceptor = ProtocolInterceptor(
+            self.mocker,
+            protocol_factory()
+        )
+        transport, protocol = await self.create_connection_original(
+            lambda: protocol_interceptor,
+            host, port, *args, **kwargs
+        )
+        return transport, protocol
 
-    async def stop(self):
-        logger.info("entering")
-        self.task.cancel()
-        await self.task
+    # async def stop(self):
+    #     logger.info("entering")
+    #     # self.task.cancel()
+    #     # await self.task
 
     async def start(self):
         logger.info("enter: self.service_port=%s", self.service_port)
-        try:
-            server = await asyncio.start_server(
-                self.client_handler,
-                # host="localhost",
-                port=self.service_port,
-                start_serving=False,
-            )
-
-            # We only want one client to connect because we're mocking a service
-            # to a single client not actually providing one to multiple clients.
-            async with server:
-                while True:
-                    logger.info("loop")
-                    await server.start_serving()
-
-        except asyncio.CancelledError:
-            pass
+        # try:
+        server = await asyncio.start_server(
+            self.client_handler,
+            port=self.service_port,
+            start_serving=True,
+        )
+        # except asyncio.CancelledError:
+        #     pass
 
     def client_handler(self, reader, writer):
         logger.info("entering")
@@ -133,6 +122,7 @@ class MockTcpServer:
 
 @pytest.fixture
 async def tcpserver(mocker, unused_tcp_port):
-    fixture = MockTcpServer(mocker, unused_tcp_port)
-    yield fixture
-    await fixture.stop()
+    return MockTcpServer(mocker, unused_tcp_port)
+    # fixture = MockTcpServer(mocker, unused_tcp_port)
+    # yield fixture
+    # # await fixture.stop()
