@@ -1,11 +1,7 @@
 import asyncio
-import logging
 from dataclasses import dataclass
 
 import pytest
-
-
-logger = logging.getLogger(__name__)
 
 
 class ProtocolInterceptor(asyncio.Protocol):
@@ -21,7 +17,6 @@ class ProtocolInterceptor(asyncio.Protocol):
         # When a connection is made we patch the "close" method of the
         # transport to intercept calls to it
 
-        logger.debug("begin")
         self.transport = transport
         self.transport_close_patcher = self.mocker.patch.object(
             self.transport, "close", self.transport_close
@@ -31,21 +26,16 @@ class ProtocolInterceptor(asyncio.Protocol):
     def transport_close(self):
         # Stop the patch to avoid infinite recursion back to this method
         # when we call 'transport.close()' just below
-        logger.debug("begin")
         self.transport_close_patcher.stop()
         self.transport.close()
-        logger.debug("end")
 
     def connection_lost(self, exc):
-        logger.debug("begin: exc=%s", exc)
         self.original_protocol.connection_lost(exc)
 
     def data_received(self, data):
-        logger.debug("begin: data=%s", data)
         self.original_protocol.data_received(data)
 
     def eof_received(self):
-        logger.debug("begin")
         self.original_protocol.eof_received()
 
     # # wait_closed is not part of the asyncio.Protocol interface but
@@ -81,9 +71,7 @@ class ExpectConnect:
                 self.server.client_connected.acquire(),
                 timeout=self.timeout,
             )
-            logger.debug("Connection made")
         except asyncio.TimeoutError:
-            logger.debug("Timed out")
             return f"Timed out waiting for connection"
 
 
@@ -102,13 +90,10 @@ class ExpectBytes:
                 self.server.reader.readexactly(len(self.expected_bytes)),
                 timeout=0.1
             )
-            logger.debug("Read data succesfully")
         except asyncio.TimeoutError:
             return f"Timed out waiting for {self.expected_bytes}"
         if received == self.expected_bytes:
-            logger.debug("Got expected bytes")
             return None
-        logger.debug("Did not get expected bytes")
         return f"Expected {self.expected_bytes} but got {received}"
 
 
@@ -164,7 +149,6 @@ class MockTcpServer:
     async def create_connection(
         self, protocol_factory, host=None, port=None, *args, **kwargs
     ):
-        logger.debug("enter")
         protocol_interceptor = ProtocolInterceptor(
             self.mocker,
             protocol_factory()
@@ -173,7 +157,6 @@ class MockTcpServer:
             lambda: protocol_interceptor,
             host, port, *args, **kwargs
         )
-        logger.debug("exit")
         return transport, protocol
 
     def check_for_errors(self):
@@ -195,7 +178,6 @@ class MockTcpServer:
             raise Exception(msg)
 
     async def start(self):
-        logger.debug("enter: current_task=%s", asyncio.current_task())
         self.server = await asyncio.start_server(
             self.handle_client_connection,
             port=self.service_port,
@@ -204,7 +186,6 @@ class MockTcpServer:
         self.evaluator_task = asyncio.create_task(self.evaluate_expectations())
 
     def handle_client_connection(self, reader, writer):
-        logger.debug("enter: current_task=%s", asyncio.current_task())
         try:
             if self.connected:
                 raise Exception("Client is already connected")
@@ -220,20 +201,16 @@ class MockTcpServer:
             await self.evaluate_next_expectation()
 
     async def evaluate_next_expectation(self):
-        logger.debug("enter: current_task=%s", asyncio.current_task())
         expectation = await self.unsatisfied_expectations.get()
-        logger.debug("expectation: %s", expectation)
-        logger.debug("evaluating expectation")
         try:
+            # `expectation` returns `None` if the expectation is met, an error
+            # string otherwise
             result = await expectation()
         except Exception as e:
-            logger.exception("Exception evaluating expectation")
             raise
-        logger.debug("expectation completed")
         if result is not None:
             self.error(Exception(result))
         self.completed_expectations.put_nowait(expectation)
-        logger.debug("exit")
 
     def error(self, exception):
         self.errors.append(exception)
@@ -293,7 +270,6 @@ class MockTcpServer:
 @pytest.fixture
 async def tcpserver(mocker, unused_tcp_port):
     fixture = MockTcpServer(mocker, unused_tcp_port)
-    logger.info("enter: current_task=%s", asyncio.current_task())
     await fixture.start()
     yield fixture
     await fixture.join()
