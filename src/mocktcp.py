@@ -4,53 +4,6 @@ from dataclasses import dataclass
 import pytest
 
 
-class ProtocolInterceptor(asyncio.Protocol):
-
-    def __init__(self, mocker, original_protocol):
-        self.mocker = mocker
-        self.original_protocol = original_protocol
-        self.transport = None
-        self.is_closed = False
-        self.transport_close_patcher = None
-
-    def connection_made(self, transport):
-        # When a connection is made we patch the "close" method of the
-        # transport to intercept calls to it
-
-        self.transport = transport
-        self.transport_close_patcher = self.mocker.patch.object(
-            self.transport, "close", self.transport_close
-        )
-        self.original_protocol.connection_made(transport)
-
-    def transport_close(self):
-        # Stop the patch to avoid infinite recursion back to this method
-        # when we call 'transport.close()' just below
-        self.transport_close_patcher.stop()
-        self.transport.close()
-
-    def connection_lost(self, exc):
-        self.original_protocol.connection_lost(exc)
-
-    def data_received(self, data):
-        self.original_protocol.data_received(data)
-
-    def eof_received(self):
-        self.original_protocol.eof_received()
-
-    # # wait_closed is not part of the asyncio.Protocol interface but
-    # # we _do_ expect it to be on the Protocol implementations what we
-    # # use
-    # async def wait_closed(self):
-    #     logger.debug("begin")
-    #     await self.original_protocol.wait_closed()
-    #     self.whiteboard.wait_closed_called = True
-
-    # # Everything else just gets passed through
-    # def __getattr__(self, key):
-    #     return getattr(self.original_protocol, key)
-
-
 @dataclass
 class ClientConnected:
     pass
@@ -88,7 +41,7 @@ class ExpectBytes:
         try:
             received = await asyncio.wait_for(
                 self.server.reader.readexactly(len(self.expected_bytes)),
-                timeout=0.1
+                timeout=1
             )
         except asyncio.TimeoutError:
             return f"Timed out waiting for {self.expected_bytes}"
@@ -112,8 +65,7 @@ class SendBytes:
 
 class MockTcpServer:
 
-    def __init__(self, mocker, service_port):
-        self.mocker = mocker
+    def __init__(self, service_port):
         self.service_port = service_port
         self.connected = False
         self.errors = []
@@ -124,40 +76,10 @@ class MockTcpServer:
         self.completed_expectations = asyncio.Queue()
         self.outstanding_expectation_count = 0
 
-        self.open_connection_original = asyncio.open_connection
-        mocker.patch(
-            "asyncio.open_connection",
-            self.open_connection,
-        )
-
-        self.create_connection_original = asyncio.get_event_loop().create_connection
-        mocker.patch.object(
-            asyncio.get_event_loop(), "create_connection",
-            self.create_connection,
-        )
-
         # self.task = asyncio.create_task(self.start())
         self.server = None
         self.reader = None
         self.writer = None
-
-    async def open_connection(self, host, port):
-        reader, writer = await self.open_connection_original(host, port)
-        await self.join()
-        return reader, writer
-
-    async def create_connection(
-        self, protocol_factory, host=None, port=None, *args, **kwargs
-    ):
-        protocol_interceptor = ProtocolInterceptor(
-            self.mocker,
-            protocol_factory()
-        )
-        transport, protocol = await self.create_connection_original(
-            lambda: protocol_interceptor,
-            host, port, *args, **kwargs
-        )
-        return transport, protocol
 
     def check_for_errors(self):
         # If we get errors, we have to clear `self.errors`.
@@ -188,7 +110,7 @@ class MockTcpServer:
     def handle_client_connection(self, reader, writer):
         try:
             if self.connected:
-                raise Exception("Client is already connected")
+                raise Exception("A second client connection was attempted")
             self.connected = True
             self.reader = reader
             self.writer = writer
@@ -254,7 +176,7 @@ class MockTcpServer:
         self.unsatisfied_expectations.put_nowait(expectation)
         self.outstanding_expectation_count += 1
 
-    def expect_connect(self, timeout=5):
+    def expect_connect(self, timeout=1):
         self.check_not_stopped()
         self.add_expectation(ExpectConnect(self, timeout=timeout))
 
@@ -268,9 +190,36 @@ class MockTcpServer:
 
 
 @pytest.fixture
-async def tcpserver(mocker, unused_tcp_port):
-    fixture = MockTcpServer(mocker, unused_tcp_port)
-    await fixture.start()
-    yield fixture
-    await fixture.join()
-    await fixture.stop()
+async def tcpserver(unused_tcp_port):
+    server = MockTcpServer(unused_tcp_port)
+    await server.start()
+    yield server
+    await server.stop()
+
+
+
+class MockTcpServerFactory:
+
+    def __init__(self, unused_tcp_port_factory):
+        self.unused_tcp_port_factory = unused_tcp_port_factory
+        self.servers = []
+
+    async def __call__(self):
+        server = MockTcpServer(self.unused_tcp_port_factory())
+        await server.start()
+        self.servers.append(server)
+        return server
+
+    async def stop(self):
+        for server in self.servers:
+            try:
+                await server.stop()
+            except Exception as e:
+                errors.append(e)
+
+
+@pytest.fixture
+async def tcpserver_factory(unused_tcp_port_factory):
+    factory = MockTcpServerFactory(unused_tcp_port_factory)
+    yield factory
+    await factory.stop()
