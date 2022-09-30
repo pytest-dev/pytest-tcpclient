@@ -1,7 +1,11 @@
 import asyncio
+import logging
 from dataclasses import dataclass
 
 import pytest
+
+
+logger = logging.getLogger()
 
 
 @dataclass
@@ -25,7 +29,7 @@ class ExpectConnect:
                 timeout=self.timeout,
             )
         except asyncio.TimeoutError:
-            return f"Timed out waiting for connection"
+            raise Exception(f"Timed out waiting for connection")
 
 
 class ExpectBytes:
@@ -44,10 +48,12 @@ class ExpectBytes:
                 timeout=1
             )
         except asyncio.TimeoutError:
-            return f"Timed out waiting for {self.expected_bytes}"
-        if received == self.expected_bytes:
-            return None
-        return f"Expected {self.expected_bytes} but got {received}"
+            logger.debug("Timed out")
+            raise Exception(f"Timed out waiting for {self.expected_bytes}")
+        if received != self.expected_bytes:
+            logger.debug(f"Expected {self.expected_bytes} but got {received}")
+            raise Exception(f"Expected {self.expected_bytes} but got {received}")
+        logger.debug("Passed")
 
 
 class SendBytes:
@@ -117,20 +123,19 @@ class MockTcpServer:
             self.error(e)
 
     async def evaluate_expectations(self):
-        while not self.stopped and not self.errors:
-            await self.evaluate_next_expectation()
+        while True:
 
-    async def evaluate_next_expectation(self):
-        expectation = await self.expecations_queue.get()
-        try:
-            # `expectation` returns `None` if the expectation is met, an error
-            # string otherwise
-            result = await expectation()
-        except Exception as e:
-            raise
-        if result is not None:
-            self.error(Exception(result))
-        self.expecations_queue.task_done()
+            # If there are already errors, there's no point evaluating the expectation.
+            # However, we do still have to call `task_done` on the queue to
+            # signal that the expectation has been processed.
+
+            expectation = await self.expecations_queue.get()
+            if not self.errors:
+                try:
+                    await expectation()
+                except Exception as e:
+                    self.error(e)
+            self.expecations_queue.task_done()
 
     def error(self, exception):
         self.errors.append(exception)

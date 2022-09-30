@@ -16,7 +16,7 @@ refresh_venv: .make/venv_refreshed
 .PHONY: test
 test: | refresh_venv
 	scripts/run_tests.sh --log-cli-level INFO tests
-	#scripts/run_tests.sh --log-cli-level INFO tests/test_mocktcp.py::test_tcpserver_factory_success
+	#scripts/run_tests.sh --log-cli-level DEBUG tests/test_mocktcp.py::test_early_error_doesnt_hang
 
 .PHONY: distclean
 distclean:
