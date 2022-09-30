@@ -1,7 +1,7 @@
 import logging
 import pytest
 
-from mocktcp import tcpserver, MockTcpServer
+from mocktcp import tcpserver, tcpserver_factory
 
 import asyncio
 
@@ -9,13 +9,11 @@ import asyncio
 # @pytest.mark.skip()
 @pytest.mark.asyncio()
 async def test_second_connection_causes_failure(tcpserver):
-    assert isinstance(tcpserver, MockTcpServer)
-    # logging.info("A")
     await asyncio.open_connection(None, tcpserver.service_port)
-    # logging.info("B")
-    with pytest.raises(Exception, match="Client is already connected"):
-        # logging.info("C")
-        await asyncio.open_connection(None, tcpserver.service_port)
+    await asyncio.open_connection(None, tcpserver.service_port)
+
+    with pytest.raises(Exception, match="A second client connection was attempted"):
+        await tcpserver.join()
 
 
 # @pytest.mark.skip()
@@ -45,8 +43,9 @@ async def test_expect_bytes_passes(tcpserver):
     writer.write(b"Hello, world")
     await tcpserver.join()
 
-    tcpserver.expect_bytes(b"Goodbye, world")
+    # Opposite order is also okay
     writer.write(b"Goodbye, world")
+    tcpserver.expect_bytes(b"Goodbye, world")
     await tcpserver.join()
 
 
@@ -139,3 +138,50 @@ async def test_expect_absent_expect_connection(tcpserver):
 
     with pytest.raises(Exception, match="'expect_connection' has not been called"):
         await tcpserver.join()
+
+
+# @pytest.mark.skip()
+@pytest.mark.asyncio()
+async def test_tcpserver_factory_second_connection_causes_failure(tcpserver_factory):
+
+    server_1 = await tcpserver_factory()
+
+    await asyncio.open_connection(None, server_1.service_port)
+    await asyncio.open_connection(None, server_1.service_port)
+
+    with pytest.raises(Exception, match="A second client connection was attempted"):
+        await server_1.join()
+
+    server_2 = await tcpserver_factory()
+
+    await asyncio.open_connection(None, server_2.service_port)
+    await asyncio.open_connection(None, server_2.service_port)
+
+    with pytest.raises(Exception, match="A second client connection was attempted"):
+        await server_2.join()
+
+
+@pytest.mark.asyncio()
+async def test_tcpserver_factory(tcpserver_factory):
+
+    server_1 = await tcpserver_factory()
+    server_2 = await tcpserver_factory()
+
+    reader_1, writer_1 = await asyncio.open_connection(None, server_1.service_port)
+    reader_2, writer_2 = await asyncio.open_connection(None, server_2.service_port)
+
+    server_1.expect_connect()
+    server_2.expect_connect()
+
+    await server_1.join()
+    await server_2.join()
+
+    writer_1.write(b"Correct1")
+    server_1.expect_bytes(b"Correct1")
+
+    writer_2.write(b"Incorrect2")
+    server_2.expect_bytes(b"Correct2")
+
+    with pytest.raises(Exception, match="Expected b'Correct2' but got b'Incorrec'"):
+        await server_1.join()
+        await server_2.join()
