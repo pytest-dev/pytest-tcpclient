@@ -15,11 +15,7 @@ refresh_venv: .make/venv_refreshed
 
 .PHONY: test
 test: | refresh_venv
-	scripts/run_tests.sh --log-cli-level DEBUG --log-cli-format "[%(asctime)s.%(msecs)s][%(name)s][%(funcName)s]: %(message)s" tests
-
-.PHONY: test
-testone: | refresh_venv
-	scripts/run_tests.sh --log-cli-level DEBUG --log-cli-format "[%(asctime)s.%(msecs)s][%(name)s][%(funcName)s]: %(message)s" tests/test_mocktcp.py::test_multi_join
+	scripts/run_tests.sh --log-cli-level INFO tests
 
 .PHONY: distclean
 distclean:
