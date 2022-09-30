@@ -126,3 +126,16 @@ async def test_delayed_join(tcpserver):
     tcpserver.expect_bytes(b"Goodbye, world")
     writer.write(b"Goodbye, world")
     await tcpserver.join()
+
+
+@pytest.mark.xfail()
+@pytest.mark.asyncio()
+async def test_expect_absent_expect_connection(tcpserver):
+
+    reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
+
+    tcpserver.expect_bytes(b"Hello, world")
+    writer.write(b"Hello, world")
+
+    with pytest.raises(Exception, match="'expect_connection' has not been called"):
+        await tcpserver.join()
