@@ -161,6 +161,7 @@ async def test_tcpserver_factory_second_connection_causes_failure(tcpserver_fact
         await server_2.join()
 
 
+# @pytest.mark.skip()
 @pytest.mark.asyncio()
 async def test_tcpserver_factory(tcpserver_factory):
 
