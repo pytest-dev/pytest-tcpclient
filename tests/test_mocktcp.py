@@ -140,6 +140,24 @@ async def test_expect_absent_expect_connection(tcpserver):
         await tcpserver.join()
 
 
+@pytest.mark.asyncio()
+async def test_early_error_doesnt_hang_test(tcpserver):
+
+    tcpserver.expect_connect()
+    tcpserver.expect_bytes(b"Hello")
+    tcpserver.expect_bytes(b"Goodbye")
+    tcpserver.expect_bytes(b"Sayonara")
+
+    reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
+    # This causes the first `expect_bytes` to fail which means that the second
+    # `expect_bytes` is still in the queue. This test ensures that that second
+    # expectation doesn't cause `join` below to hang. It did previously.
+    writer.write(b"Adios amigo!")
+
+    with pytest.raises(Exception, match="Expected b'Hello' but got b'Adios'"):
+        await tcpserver.join()
+
+
 # @pytest.mark.skip()
 @pytest.mark.asyncio()
 async def test_tcpserver_factory_second_connection_causes_failure(tcpserver_factory):
