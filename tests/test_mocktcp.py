@@ -1,37 +1,32 @@
+import asyncio
 import logging
 import pytest
 
 from mocktcp import tcpserver, tcpserver_factory
 
-import asyncio
 
-
-# @pytest.mark.skip()
 @pytest.mark.asyncio()
 async def test_second_connection_causes_failure(tcpserver):
     await asyncio.open_connection(None, tcpserver.service_port)
     await asyncio.open_connection(None, tcpserver.service_port)
 
-    with pytest.raises(Exception, match="A second client connection was attempted"):
+    with pytest.raises(Exception, match="^A second client connection was attempted$"):
         await tcpserver.join()
 
 
-# @pytest.mark.skip()
 @pytest.mark.asyncio()
 async def test_expect_connect_passes(tcpserver):
     tcpserver.expect_connect()
     await asyncio.open_connection(None, tcpserver.service_port)
 
 
-# @pytest.mark.skip()
 @pytest.mark.asyncio()
 async def test_expect_connect_fails(tcpserver):
     tcpserver.expect_connect(timeout=0.1)
-    with pytest.raises(Exception, match="Timed out waiting for connection"):
+    with pytest.raises(Exception, match="^Timed out waiting for connection$"):
         await tcpserver.join()
 
 
-# @pytest.mark.skip()
 @pytest.mark.asyncio()
 async def test_expect_bytes_passes(tcpserver):
 
@@ -39,17 +34,16 @@ async def test_expect_bytes_passes(tcpserver):
     reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
     await tcpserver.join()
 
+    # Expectation followed by client action should work
     tcpserver.expect_bytes(b"Hello, world")
     writer.write(b"Hello, world")
-    await tcpserver.join()
 
-    # Opposite order is also okay
+    # Client action followed by expectation should also work
     writer.write(b"Goodbye, world")
     tcpserver.expect_bytes(b"Goodbye, world")
     await tcpserver.join()
 
 
-# @pytest.mark.skip()
 @pytest.mark.asyncio()
 async def test_expect_bytes_nothing_sent_fails(tcpserver):
 
@@ -62,13 +56,12 @@ async def test_expect_bytes_nothing_sent_fails(tcpserver):
     await tcpserver.join()
 
     # Times out because nothing is sent
-    tcpserver.expect_bytes(b"Hello, world")
+    tcpserver.expect_bytes(b"Goodbye, world", timeout=0.1)
 
-    with pytest.raises(Exception, match="Timed out waiting for b'Hello, world'"):
+    with pytest.raises(Exception, match=r"^Timed out waiting for b'Goodbye, world'$"):
         await tcpserver.join()
 
 
-# @pytest.mark.skip()
 @pytest.mark.asyncio()
 async def test_expect_bytes_wrong_bytes_fails(tcpserver):
 
@@ -85,11 +78,10 @@ async def test_expect_bytes_wrong_bytes_fails(tcpserver):
     tcpserver.expect_bytes(b"Hello, world")
     writer.write(b"Goodbye, world")
 
-    with pytest.raises(Exception, match="Expected b'Hello, world' but got b'Goodbye, wor'"):
+    with pytest.raises(Exception, match="^Expected b'Hello, world' but got b'Goodbye, wor'$"):
         await tcpserver.join()
 
 
-# @pytest.mark.skip()
 @pytest.mark.asyncio()
 async def test_send_bytes(tcpserver):
 
@@ -110,7 +102,6 @@ async def test_send_bytes(tcpserver):
     assert await reader.read(6) == b"Adios!"
 
 
-# @pytest.mark.skip()
 @pytest.mark.asyncio()
 async def test_delayed_join(tcpserver):
 
@@ -127,7 +118,6 @@ async def test_delayed_join(tcpserver):
     await tcpserver.join()
 
 
-@pytest.mark.xfail()
 @pytest.mark.asyncio()
 async def test_expect_absent_expect_connection(tcpserver):
 
@@ -136,29 +126,43 @@ async def test_expect_absent_expect_connection(tcpserver):
     tcpserver.expect_bytes(b"Hello, world")
     writer.write(b"Hello, world")
 
-    with pytest.raises(Exception, match="'expect_connection' has not been called"):
+    with pytest.raises(Exception, match=r"^Expected BytesReadEvent event but got ClientConnectedEvent\(\)$"):
         await tcpserver.join()
 
 
 @pytest.mark.asyncio()
 async def test_early_error_doesnt_hang_test(tcpserver):
 
+    reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
+
     tcpserver.expect_connect()
     tcpserver.expect_bytes(b"Hello")
     tcpserver.expect_bytes(b"Goodbye")
     tcpserver.expect_bytes(b"Sayonara")
 
-    reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
     # This causes the first `expect_bytes` to fail which means that the second
-    # `expect_bytes` is still in the queue. This test ensures that that second
+    # `expect_bytes` is still in the expectation queue. This test ensures that that second
     # expectation doesn't cause `join` below to hang. It did previously.
     writer.write(b"Adios amigo!")
 
-    with pytest.raises(Exception, match="Expected b'Hello' but got b'Adios'"):
+    with pytest.raises(Exception, match="^Expected b'Hello' but got b'Adios'$"):
         await tcpserver.join()
 
 
-# @pytest.mark.skip()
+@pytest.mark.asyncio()
+async def test_ordering_error(tcpserver):
+
+    # This scenario used to cause an error
+
+    tcpserver.expect_connect()
+    tcpserver.expect_bytes(b"Hello")
+
+    reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
+    writer.write(b"Hello")
+
+    await tcpserver.join()
+
+
 @pytest.mark.asyncio()
 async def test_tcpserver_factory_second_connection_causes_failure(tcpserver_factory):
 
@@ -167,7 +171,7 @@ async def test_tcpserver_factory_second_connection_causes_failure(tcpserver_fact
     await asyncio.open_connection(None, server_1.service_port)
     await asyncio.open_connection(None, server_1.service_port)
 
-    with pytest.raises(Exception, match="A second client connection was attempted"):
+    with pytest.raises(Exception, match="^A second client connection was attempted$"):
         await server_1.join()
 
     server_2 = await tcpserver_factory()
@@ -175,11 +179,10 @@ async def test_tcpserver_factory_second_connection_causes_failure(tcpserver_fact
     await asyncio.open_connection(None, server_2.service_port)
     await asyncio.open_connection(None, server_2.service_port)
 
-    with pytest.raises(Exception, match="A second client connection was attempted"):
+    with pytest.raises(Exception, match="^A second client connection was attempted$"):
         await server_2.join()
 
 
-# @pytest.mark.skip()
 @pytest.mark.asyncio()
 async def test_tcpserver_factory(tcpserver_factory):
 
@@ -201,6 +204,6 @@ async def test_tcpserver_factory(tcpserver_factory):
     writer_2.write(b"Incorrect2")
     server_2.expect_bytes(b"Correct2")
 
-    with pytest.raises(Exception, match="Expected b'Correct2' but got b'Incorrec'"):
+    with pytest.raises(Exception, match="^Expected b'Correct2' but got b'Incorrec'$"):
         await server_1.join()
         await server_2.join()
