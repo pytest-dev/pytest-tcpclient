@@ -72,9 +72,7 @@ class MockTcpServer:
         self.stopped = False
         self.instructions = []
         self.client_connected = asyncio.Semaphore(0)
-        self.unsatisfied_expectations = asyncio.Queue()
-        self.completed_expectations = asyncio.Queue()
-        self.outstanding_expectation_count = 0
+        self.expecations_queue = asyncio.Queue()
 
         # self.task = asyncio.create_task(self.start())
         self.server = None
@@ -123,7 +121,7 @@ class MockTcpServer:
             await self.evaluate_next_expectation()
 
     async def evaluate_next_expectation(self):
-        expectation = await self.unsatisfied_expectations.get()
+        expectation = await self.expecations_queue.get()
         try:
             # `expectation` returns `None` if the expectation is met, an error
             # string otherwise
@@ -132,7 +130,7 @@ class MockTcpServer:
             raise
         if result is not None:
             self.error(Exception(result))
-        self.completed_expectations.put_nowait(expectation)
+        self.expecations_queue.task_done()
 
     def error(self, exception):
         self.errors.append(exception)
@@ -153,40 +151,24 @@ class MockTcpServer:
             await self.server.wait_closed()
 
     async def join(self):
-
-        # Have to check for errors here because not all errors are caused by
-        # unment expecations. Therefore, its possible for `outstanding_expectation_count` to
-        # be 0 when `join` is called, which means that the body of the loop below will not
-        # be executed.
+        await self.expecations_queue.join()
         self.check_for_errors()
-
-        # While there are still outstanding expecations, wait for each of them to
-        # be completed and then check for errors.
-        while self.outstanding_expectation_count:
-            await self.completed_expectations.get()
-            self.outstanding_expectation_count -= 1
-            # May raise exception and exit loop prematurely
-            self.check_for_errors()
 
     def check_not_stopped(self):
         if self.stopped:
             raise Exception("Fixture is stopped")
 
-    def add_expectation(self, expectation):
-        self.unsatisfied_expectations.put_nowait(expectation)
-        self.outstanding_expectation_count += 1
-
     def expect_connect(self, timeout=1):
         self.check_not_stopped()
-        self.add_expectation(ExpectConnect(self, timeout=timeout))
+        self.expecations_queue.put_nowait(ExpectConnect(self, timeout=timeout))
 
     def expect_bytes(self, expected_bytes):
         self.check_not_stopped()
-        self.add_expectation(ExpectBytes(self, expected_bytes))
+        self.expecations_queue.put_nowait(ExpectBytes(self, expected_bytes))
 
     def send_bytes(self, message):
         self.check_not_stopped()
-        self.add_expectation(SendBytes(self, message))
+        self.expecations_queue.put_nowait(SendBytes(self, message))
 
 
 @pytest.fixture
