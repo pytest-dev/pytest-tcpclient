@@ -24,4 +24,4 @@ done
 #    pycodestyle src tests conftest.py
 #fi
 
-python -m pytest "${pytest_args[@]}" -rf tests -s
+python -m pytest -rf -s "${pytest_args[@]}"
