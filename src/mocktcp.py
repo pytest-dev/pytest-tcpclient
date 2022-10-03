@@ -33,6 +33,12 @@ class ExpectConnect:
     async def server_action(self):
         # The server already has code to perform client connection and generate
         # `ClientConnectedEvent`
+
+        # It would be neater if this method called `start_accepting_connections` on the
+        # server rather than have the server hardcoded to do so. However, I tried that
+        # and it doesn't work. At least, it works occasionally but most of the time it
+        # just hangs and `evaluate` below times out. Clearly, there's some sort
+        # of nasty race condition that I don't know how to uncover.
         pass
 
     async def evaluate(self):
@@ -133,24 +139,28 @@ class MockTcpServer:
             raise Exception(msg)
 
     async def start(self):
+        self.evaluator_task = asyncio.create_task(self.evaluate_expectations())
+        self.server_action_task = asyncio.create_task(self.execute_server_actions())
+        await self.start_accepting_connections()
+
+    async def start_accepting_connections(self):
+
+        def handle_client_connection(reader, writer):
+            try:
+                if self.connected:
+                    raise Exception("A second client connection was attempted")
+                self.connected = True
+                self.reader = reader
+                self.writer = writer
+                self.actual_events_queue.put_nowait(ClientConnectedEvent())
+            except Exception as e:
+                self.error(e)
+
         self.server = await asyncio.start_server(
-            self.handle_client_connection,
+            handle_client_connection,
             port=self.service_port,
             start_serving=True,
         )
-        self.evaluator_task = asyncio.create_task(self.evaluate_expectations())
-        self.server_action_task = asyncio.create_task(self.execute_server_actions())
-
-    def handle_client_connection(self, reader, writer):
-        try:
-            if self.connected:
-                raise Exception("A second client connection was attempted")
-            self.connected = True
-            self.reader = reader
-            self.writer = writer
-            self.actual_events_queue.put_nowait(ClientConnectedEvent())
-        except Exception as e:
-            self.error(e)
 
     async def evaluate_expectations(self):
         while True:
