@@ -33,12 +33,6 @@ class ExpectConnect:
     async def server_action(self):
         # The server already has code to perform client connection and generate
         # `ClientConnectedEvent`
-
-        # It would be neater if this method called `start_accepting_connections` on the
-        # server rather than have the server hardcoded to do so. However, I tried that
-        # and it doesn't work. At least, it works occasionally but most of the time it
-        # just hangs and `evaluate` below times out. Clearly, there's some sort
-        # of nasty race condition that I don't know how to uncover.
         pass
 
     async def evaluate(self):
@@ -141,6 +135,20 @@ class MockTcpServer:
     async def start(self):
         self.evaluator_task = asyncio.create_task(self.evaluate_expectations())
         self.server_action_task = asyncio.create_task(self.execute_server_actions())
+
+        # I thought it would be neater to have `ExpectConnect.server_action`
+        # method call `start_accepting_connections` but then there's a race
+        # between the server starting to accept connections and the test client
+        # actually making the connection. If the client wins, there's no server
+        # waiting on the port and connection attempt fails. I tried it and the client
+        # usually wins.
+        #
+        # In fact, there is no guarantee that the client will call
+        # `expect_connect` _before_ actually attempting the connection. It may
+        # try the connection and then call `expect_connect`. We want that to
+        # work. So we have to guarantee that the server is already accepting
+        # connections by the time the test is invoked with the `tcpserver`
+        # fixture.
         await self.start_accepting_connections()
 
     async def start_accepting_connections(self):
