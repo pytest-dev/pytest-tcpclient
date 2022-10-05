@@ -67,7 +67,9 @@ class UnreadSentBytes(ServerActionEvent):
 class UnexpectedEventError(Exception):
 
     def __init__(self, expected_event, actual_event):
-        super().__init__(f"UnexpectedEventError(expected_event={expected_event}, actual_event={actual_event}")
+        super().__init__(
+            f"UnexpectedEventError(expected_event={expected_event}, actual_event={actual_event}"
+        )
         self.expected_event = expected_event
         self.actual_event = actual_event
 
@@ -246,9 +248,11 @@ def interpret_error(exception):
             if isinstance(actual_event, SecondClientConnectionAttempted):
                 return "While waiting for client to disconnect a second connection was attempted"
             elif isinstance(actual_event, TimeoutEvent):
-                return "Timed out waiting for client to disconnect. Remember to call `writer.close()`."
+                return "Timed out waiting for client to disconnect. " + \
+                        "Remember to call `writer.close()`."
             elif isinstance(actual_event, BytesReadEvent):
-                return f"Received unexpected data while waiting for client to disconnect. Data is {actual_event.bytes_read}."
+                return "Received unexpected data while waiting for client to disconnect. " + \
+                        f"Data is {actual_event.bytes_read}."
             elif isinstance(actual_event, ExceptionEvent):
                 if isinstance(actual_event.exception, ConnectionResetError):
                     return "Connection was reset. Did client close writer prematurely?"
@@ -259,15 +263,18 @@ def interpret_error(exception):
             if isinstance(actual_event, TimeoutEvent):
                 return f"Timed out waiting for {expected_event.bytes_read}"
             elif isinstance(actual_event, ClientConnectedEvent):
-                return f"Missing `expect_connect()` before `expect_bytes({expected_event.bytes_read})`"
+                return "Missing `expect_connect()` before " + \
+                        f"`expect_bytes({expected_event.bytes_read})`"
             elif isinstance(actual_event, BytesReadEvent):
-                return f"Expected to read {expected_event.bytes_read} but actually read {actual_event.bytes_read}"
+                return f"Expected to read {expected_event.bytes_read} " + \
+                        f"but actually read {actual_event.bytes_read}"
         elif isinstance(expected_event, ClientCalledWriterWaitClosed):
             if isinstance(actual_event, TimeoutEvent):
                 return "Timed out waiting for client to call `await writer.wait_closed()`."
         elif isinstance(expected_event, NoRemainingSentData):
             if isinstance(actual_event, UnreadSentBytes):
-                return f"There is data sent by server that was not read by client: unread_bytes={actual_event.unread_bytes}."
+                return "There is data sent by server that was not read by client: " + \
+                        f"unread_bytes={actual_event.unread_bytes}."
     return f"Cannot interpret {exception}, {type(exception)=}"
 
 
@@ -513,7 +520,9 @@ class MockTcpServerFactory:
 
     async def intercept_open_connection(self, host, port):
         if host is not None:
-            raise Exception(f"`host` parameter to `open_connection` should be `None` but it is {host}")
+            raise Exception(
+                f"`host` parameter to `open_connection` should be `None` but it is {host}"
+            )
         client_reader, client_writer = await self.original_open_connection(host, port)
         server = self.servers[port]
         server.register_client_streams(client_reader, client_writer)

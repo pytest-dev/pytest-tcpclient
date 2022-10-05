@@ -1,0 +1,9 @@
+#!/bin/sh
+
+set -eu
+
+virtualenv -p38 venv
+
+. venv/bin/activate
+
+pip install --upgrade pip setuptools wheel

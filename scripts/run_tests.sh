@@ -26,4 +26,5 @@ done
 
 python -m pytest \
     --log-cli-format "[%(asctime)s.%(msecs)s][%(name)s][%(funcName)s]: %(message)s" \
+    --cov src --cov-report term-missing \
     -rf -s "${pytest_args[@]}"
