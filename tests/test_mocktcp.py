@@ -164,7 +164,6 @@ async def test_send_bytes(tcpserver):
     await writer.wait_closed()
 
 
-# @pytest.mark.skip("Incomplete")
 @pytest.mark.asyncio()
 async def test_no_remaining_sent_data(tcpserver):
 
@@ -188,9 +187,36 @@ async def test_no_remaining_sent_data(tcpserver):
 
 
 @pytest.mark.asyncio()
+async def test_connection_reset_error(tcpserver):
+
+    # Somehow, the following scenario causes a connection reset error to be raised in the
+    # mock server. Probably it will run differently on platforms other than Python 3.8 on Linux.
+
+    tcpserver.expect_connect()
+    reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
+    await tcpserver.join()
+
+    tcpserver.send_bytes(b"Hola!")
+    await tcpserver.join()
+    assert await reader.read(5) == b"Hola!"
+
+    tcpserver.send_bytes(b"Adios!")
+    tcpserver.send_bytes(b"Amigo!")
+
+    writer.close()
+    await writer.wait_closed()
+
+    tcpserver.expect_disconnect()
+
+    with pytest.raises(Exception, match=r"^Connection was reset. Did client close writer prematurely\?$"):
+        await tcpserver.join()
+
+
+@pytest.mark.asyncio()
 async def test_delayed_join(tcpserver):
 
-    # `join` not called until right at the end. This exposes a bug
+    # `join` not called until right at the end. This was written to expose a bug that
+    # is now fixed.
 
     tcpserver.expect_connect()
     reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
