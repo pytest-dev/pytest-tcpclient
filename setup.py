@@ -1,11 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 
-
-setup(
-    name="mocktcp",
-    version="0.1.0",
-    packages=find_packages(where="src"),
-    package_dir={"": "src"},
-    include_package_data=True,
-    license="MIT",
-)
+if __name__ == "__main__":
+    setup()

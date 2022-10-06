@@ -2,7 +2,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 
-import pytest
+import pytest_asyncio
 
 
 @dataclass
@@ -553,13 +553,13 @@ class MockTcpServerFactory:
             raise errors[0]
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def tcpserver_factory(unused_tcp_port_factory, mocker):
     factory = MockTcpServerFactory(unused_tcp_port_factory, mocker)
     yield factory
     await factory.stop()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def tcpserver(tcpserver_factory):
     return await tcpserver_factory()

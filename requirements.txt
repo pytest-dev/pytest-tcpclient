@@ -1,0 +1,11 @@
+# These are tools that are required for development using the virtualenv
+# It should _not_ include package dependencies that are already listed
+# in setup.cfg
+
+coverage>=5.3.1,<6
+pylint>=2.5.3,<3
+tox>=3.14.6,<4
+pycodestyle>=2.5.0,<3
+twine>=3.1.1
+pytest-cov>=4.0.0,<5
+build>=0.8.0
