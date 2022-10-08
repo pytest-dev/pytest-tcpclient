@@ -2,8 +2,6 @@ import asyncio
 import logging
 import pytest
 
-from mocktcp import tcpserver, tcpserver_factory
-
 
 logger = logging.getLogger(__name__)
 
