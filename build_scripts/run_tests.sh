@@ -10,7 +10,12 @@ export PYTHONPATH=src
 
 pytest_args=()
 
+export COV_CORE_SOURCE=src
+export COV_CORE_CONFIG=.coveragerc
+export COV_CORE_DATAFILE=.coverage.eager
+
 python -m pytest \
     --log-cli-format "[%(asctime)s.%(msecs)s][%(name)s][%(funcName)s]: %(message)s" \
     --cov src --cov-report term-missing \
+    --cov-append \
     -rf -s "${@}"
