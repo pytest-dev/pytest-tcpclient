@@ -74,7 +74,14 @@ dist: setup.cfg setup.py refresh_venv
 
 #------------------------------------------------------------------------------
 # pypi
-.PHONY: upload_testpypi
-upload_testpypi: dist refresh_venv
+.PHONY: testpypi_upload
+testpypi_upload: dist refresh_venv
 	#build_scripts/add_version_tag
 	twine upload --repository testpypi dist/*
+
+#------------------------------------------------------------------------------
+# pypi
+.PHONY: pypi_upload
+pypi_upload: dist refresh_venv
+	#build_scripts/add_version_tag
+	twine upload --repository pypi dist/*
