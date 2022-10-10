@@ -1,6 +1,10 @@
 import asyncio
 import logging
+import struct
+
 import pytest
+
+from pytest_mocktcp.framing import write_frame, read_frame
 
 
 logger = logging.getLogger(__name__)
@@ -246,7 +250,6 @@ async def test_readexactly(tcpserver):
         await tcpserver.join()
 
 
-@pytest.mark.skip()
 @pytest.mark.asyncio()
 async def test_readuntil(tcpserver):
 
@@ -367,6 +370,97 @@ async def test_ordering_error(tcpserver):
 
     writer.close()
     await writer.wait_closed()
+
+
+@pytest.mark.asyncio()
+async def test_expect_frame_passes(tcpserver):
+    reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
+    tcpserver.expect_connect()
+
+    writer.write(b"Hello, world")
+    tcpserver.expect_bytes(b"Hello, world")
+
+    write_frame(writer, b"Goodbye, world")
+    tcpserver.expect_frame(b"Goodbye, world")
+
+    writer.close()
+    await writer.wait_closed()
+
+
+@pytest.mark.asyncio()
+async def test_expect_frame_nothing_sent_fails(tcpserver):
+
+    tcpserver.expect_connect()
+    reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
+
+    # Passes
+    writer.write(b"Hello, world")
+    tcpserver.expect_bytes(b"Hello, world")
+    await tcpserver.join()
+
+    # Times out because nothing is sent
+    tcpserver.expect_frame(b"Goodbye, world", timeout=0.1)
+
+    with pytest.raises(Exception, match=r"^Timed out waiting for frame b'Goodbye, world'$"):
+        await tcpserver.join()
+
+    writer.close()
+
+
+@pytest.mark.asyncio()
+async def test_expect_frame_wrong_bytes_fails(tcpserver):
+
+    tcpserver.expect_connect()
+    reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
+
+    # Passes
+    tcpserver.expect_bytes(b"Hello, world")
+    writer.write(b"Hello, world")
+    await tcpserver.join()
+
+    # Times out because nothing is sent
+    tcpserver.expect_frame(b"Bonjour")
+    write_frame(writer, b"Goodbye, world")
+
+    with pytest.raises(
+        Exception,
+        match=r"^Expected to get frame b'Bonjour' but actually got frame b'Goodbye, world'$"
+    ):
+        await tcpserver.join()
+
+    writer.close()
+
+
+@pytest.mark.asyncio()
+async def test_send_frame(tcpserver):
+    tcpserver.expect_connect()
+    reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
+
+    tcpserver.send_frame(b"Hello")
+    assert await read_frame(reader) == b"Hello"
+
+    writer.close()
+    await writer.wait_closed()
+
+
+@pytest.mark.asyncio()
+async def test_sent_frame_not_read_by_client(tcpserver):
+    tcpserver.expect_connect()
+    reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
+
+    tcpserver.send_frame(b"Hello")
+    await tcpserver.join()
+
+    writer.close()
+    await writer.wait_closed()
+    tcpserver.expect_disconnect()
+
+    with pytest.raises(
+        Exception,
+        match=r"^There is data sent by server that was not read by client: "
+            r"unread_bytes=b'\\x00\\x00\\x00\\x05Hello"
+    ):
+        await tcpserver.join()
 
 
 @pytest.mark.asyncio()
