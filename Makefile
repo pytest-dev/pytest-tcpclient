@@ -11,7 +11,7 @@ verify_active_venv:
 		exit 1; \
 	fi
 
-.make/venv_refreshed: setup.cfg requirements.txt | verify_active_venv
+.make/venv_refreshed: setup.cfg pyproject.toml requirements.txt | verify_active_venv
 	python -m pip install -v -r requirements.txt
 	python -m pip install -v -e .
 	mkdir -p ${@D}

@@ -1,0 +1,28 @@
+[build-system]
+requires = [
+    "setuptools>=45.0.0",
+    "wheel",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pytest-mocktcp"
+version = "0.1.16"
+license.file = "LICENSE"
+authors = [
+    { name="Anders Lindstrom", email="anders@anderslindstrom.com"},
+]
+description = "A pytest plugin for testing TCP clients"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/andersglindstrom/pytest-mocktcp.git"
+
+[project.entry-points.pytest11]
+mocktcp = "pytest_mocktcp.plugin"
