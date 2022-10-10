@@ -27,7 +27,8 @@ refresh_venv: .make/venv_refreshed
 
 .PHONY: test
 test: refresh_venv
-	build_scripts/run_tests.sh --log-cli-level INFO tests
+	#build_scripts/run_tests.sh --log-cli-level INFO tests
+	build_scripts/run_tests.sh tests
 	#build_scripts/run_tests.sh --log-cli-level DEBUG tests/test_mocktcp.py::test_no_remaining_sent_data
 
 .PHONY: testlf
