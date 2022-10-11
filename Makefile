@@ -27,7 +27,7 @@ refresh_venv: .make/venv_refreshed
 
 .PHONY: test
 test: refresh_venv
-	build_scripts/run_tests.sh tests
+	build_scripts/run_tests.sh --log-cli-level DEBUG tests
 	#build_scripts/run_tests.sh --log-cli-level DEBUG tests/pytest_mocktcp/test_plugin.py::test_sent_frame_not_read_by_client
 
 .PHONY: testlf
