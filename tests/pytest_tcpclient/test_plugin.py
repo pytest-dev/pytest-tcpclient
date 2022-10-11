@@ -4,7 +4,7 @@ import struct
 
 import pytest
 
-from pytest_mocktcp.framing import write_frame, read_frame
+from pytest_tcpclient.framing import write_frame, read_frame
 
 
 logger = logging.getLogger(__name__)
