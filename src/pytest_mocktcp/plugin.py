@@ -5,6 +5,9 @@ from dataclasses import dataclass
 import pytest_asyncio
 
 
+logger = logging.getLogger(__name__)
+
+
 @dataclass
 class ServerActionEvent:
     pass
@@ -213,7 +216,8 @@ class ExpectClientReadAllSentBytes:
             if read_bytes == sent_bytes:
                 return NoRemainingSentData()
             else:
-                assert sent_bytes.startswith(read_bytes)
+                assert sent_bytes.startswith(read_bytes), \
+                    f"sent_bytes does not start with read_bytes: {sent_bytes=}, {read_bytes=}"
                 return UnreadSentBytes(sent_bytes[len(read_bytes):])
         except asyncio.TimeoutError:
             return TimeoutEvent()
@@ -348,8 +352,33 @@ class MockTcpServer:
         self.original_client_reader_read = self.client_reader.read
         self.mocker.patch.object(self.client_reader, "read", self.client_read)
 
+        # No need to patch `readline` because it is implemented with `readuntil`
+        # self.original_client_reader_readline = self.client_reader.readline
+        # self.mocker.patch.object(self.client_reader, "readline", self.client_readline)
+
+        self.original_client_reader_readexactly = self.client_reader.readexactly
+        self.mocker.patch.object(self.client_reader, "readexactly", self.client_readexactly)
+
+        self.original_client_reader_readuntil = self.client_reader.readuntil
+        self.mocker.patch.object(self.client_reader, "readuntil", self.client_readuntil)
+
     async def client_read(self, *args, **kwargs):
         data = await self.original_client_reader_read(*args, **kwargs)
+        self.data_read_by_client += data
+        return data
+
+    # async def client_readline(self, *args, **kwargs):
+    #     data = await self.original_client_reader_readline(*args, **kwargs)
+    #     self.data_read_by_client += data
+    #     return data
+
+    async def client_readexactly(self, *args, **kwargs):
+        data = await self.original_client_reader_readexactly(*args, **kwargs)
+        self.data_read_by_client += data
+        return data
+
+    async def client_readuntil(self, *args, **kwargs):
+        data = await self.original_client_reader_readuntil(*args, **kwargs)
         self.data_read_by_client += data
         return data
 
@@ -427,6 +456,7 @@ class MockTcpServer:
             try:
                 server_event = await server_action()
             except Exception as e:
+                logger.exception("Exception during server action execution")
                 server_event = ExceptionEvent(e)
             if server_event is not None:
                 self.server_event_queue.put_nowait(server_event)

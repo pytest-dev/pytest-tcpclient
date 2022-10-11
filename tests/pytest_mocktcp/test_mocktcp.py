@@ -201,6 +201,76 @@ async def test_no_remaining_sent_data(tcpserver):
 
 
 @pytest.mark.asyncio()
+async def test_readline(tcpserver):
+
+    tcpserver.expect_connect()
+    reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
+    await tcpserver.join()
+
+    tcpserver.send_bytes(b"One\nTwo\n")
+    await tcpserver.join()
+    assert await reader.readline() == b"One\n"
+
+    writer.close()
+    await writer.wait_closed()
+
+    tcpserver.expect_disconnect()
+
+    with pytest.raises(
+        Exception,
+        match=r"^There is data sent by server that was not read by client: unread_bytes=b'Two\\n'."
+    ):
+        await tcpserver.join()
+
+
+@pytest.mark.asyncio()
+async def test_readexactly(tcpserver):
+
+    tcpserver.expect_connect()
+    reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
+    await tcpserver.join()
+
+    tcpserver.send_bytes(b"OneTwo")
+    await tcpserver.join()
+    assert await reader.readexactly(3) == b"One"
+
+    writer.close()
+    await writer.wait_closed()
+
+    tcpserver.expect_disconnect()
+
+    with pytest.raises(
+        Exception,
+        match=r"^There is data sent by server that was not read by client: unread_bytes=b'Two'."
+    ):
+        await tcpserver.join()
+
+
+@pytest.mark.skip()
+@pytest.mark.asyncio()
+async def test_readuntil(tcpserver):
+
+    tcpserver.expect_connect()
+    reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
+    await tcpserver.join()
+
+    tcpserver.send_bytes(b"AAAXBBB")
+    await tcpserver.join()
+    assert await reader.readuntil(b'X') == b"AAAX"
+
+    writer.close()
+    await writer.wait_closed()
+
+    tcpserver.expect_disconnect()
+
+    with pytest.raises(
+        Exception,
+        match=r"^There is data sent by server that was not read by client: unread_bytes=b'BBB'."
+    ):
+        await tcpserver.join()
+
+
+@pytest.mark.asyncio()
 async def test_connection_reset_error(tcpserver):
 
     # Somehow, the following scenario causes a connection reset error to be raised in the
