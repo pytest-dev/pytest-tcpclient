@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pytest-mocktcp"
-version = "0.4.0"
+version = "0.5.0"
 license.file = "LICENSE"
 authors = [
     { name="Anders Lindstrom", email="anders@anderslindstrom.com"},
