@@ -1,4 +1,4 @@
-name: Build pytest-mocktcp
+name: Build pytest-tcpclient
 
 on: [push]
 jobs:

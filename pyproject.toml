@@ -6,7 +6,7 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pytest-mocktcp"
+name = "pytest-tcpclient"
 version = "0.5.0"
 license.file = "LICENSE"
 authors = [
@@ -22,7 +22,7 @@ classifiers = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/andersglindstrom/pytest-mocktcp.git"
+"Homepage" = "https://github.com/andersglindstrom/pytest-tcpclient.git"
 
 [project.entry-points.pytest11]
-mocktcp = "pytest_mocktcp.plugin"
+tcpclient = "pytest_tcpclient.plugin"

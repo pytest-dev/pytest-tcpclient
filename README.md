@@ -1,6 +1,6 @@
-# pytest-mocktcp
+# pytest-tcpclient
 
-pytest mocking of TCP servers
+`pytest` plugin for testing TCP clients using server mocking
 
 ## Dev Setup
 
