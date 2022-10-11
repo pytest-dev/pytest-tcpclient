@@ -1,8 +1,12 @@
 import asyncio
 import logging
+
 from dataclasses import dataclass
 
 import pytest_asyncio
+
+
+from .framing import read_frame, write_frame
 
 
 logger = logging.getLogger(__name__)
@@ -53,6 +57,12 @@ class ExceptionEvent(ServerActionEvent):
 class BytesReadEvent(ServerActionEvent):
 
     bytes_read: bytes
+
+
+@dataclass
+class FrameReadEvent(ServerActionEvent):
+
+    payload: bytes
 
 
 @dataclass
@@ -173,6 +183,31 @@ class ExpectBytes:
             raise UnexpectedEventError(BytesReadEvent(self.expected_bytes), next_event)
 
 
+class ExpectFrame:
+
+    def __init__(self, server, expected_payload, timeout):
+        self.server = server
+        self.expected_payload = expected_payload
+        self.timeout = timeout
+
+    async def server_action(self):
+        try:
+            payload = await asyncio.wait_for(
+                read_frame(self.server.reader),
+                timeout=self.timeout,
+            )
+            return FrameReadEvent(payload)
+        except asyncio.TimeoutError as e:
+            return TimeoutEvent()
+
+    async def evaluate(self):
+        next_event = await self.server.server_event_queue.get()
+        if not isinstance(next_event, FrameReadEvent):
+            raise UnexpectedEventError(FrameReadEvent(self.expected_payload), next_event)
+        if next_event.payload != self.expected_payload:
+            raise UnexpectedEventError(FrameReadEvent(self.expected_payload), next_event)
+
+
 class ExpectReadZeroBytes:
 
     def __init__(self, server, timeout):
@@ -242,6 +277,20 @@ class SendBytes:
         pass
 
 
+class SendFrame:
+
+    def __init__(self, server, payload):
+        self.server = server
+        self.payload = payload
+
+    async def server_action(self):
+        write_frame(self.server.writer, self.payload)
+        await self.server.writer.drain()
+
+    async def evaluate(self):
+        pass
+
+
 def interpret_error(exception):
 
     if isinstance(exception, UnexpectedEventError):
@@ -271,6 +320,15 @@ def interpret_error(exception):
             elif isinstance(actual_event, BytesReadEvent):
                 return f"Expected to read {expected_event.bytes_read} " + \
                         f"but actually read {actual_event.bytes_read}"
+        elif isinstance(expected_event, FrameReadEvent):
+            if isinstance(actual_event, TimeoutEvent):
+                return f"Timed out waiting for frame {expected_event.payload}"
+            # elif isinstance(actual_event, ClientConnectedEvent):
+            #     return "Missing `expect_connect()` before " + \
+            #             f"`expect_bytes({expected_event.bytes_read})`"
+            elif isinstance(actual_event, FrameReadEvent):
+                return f"Expected to get frame {expected_event.payload} " + \
+                        f"but actually got frame {actual_event.payload}"
         elif isinstance(expected_event, ClientCalledWriterWaitClosed):
             if isinstance(actual_event, TimeoutEvent):
                 return "Timed out waiting for client to call `await writer.wait_closed()`."
@@ -525,6 +583,16 @@ class MockTcpServer:
     def send_bytes(self, data):
         self.check_not_stopped()
         self.expecations_queue.put_nowait(SendBytes(self, data))
+
+    def expect_frame(self, expected_payload, timeout=1):
+        self.check_not_stopped()
+        self.expecations_queue.put_nowait(ExpectFrame(
+            self, expected_payload=expected_payload, timeout=timeout
+        ))
+
+    def send_frame(self, payload):
+        self.check_not_stopped()
+        self.expecations_queue.put_nowait(SendFrame(self, payload))
 
     def expect_disconnect(self, timeout=1):
         self.check_not_stopped()
