@@ -90,6 +90,7 @@ class UnexpectedEventError(Exception):
 class ExpectConnect:
 
     def __init__(self, server, timeout):
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.server = server
         self.timeout = timeout
 
@@ -103,15 +104,19 @@ class ExpectConnect:
         # case of a timeout. We have to do that here.
 
         try:
+            self.logger.debug("Expecting connection from client")
             next_event = await asyncio.wait_for(
                 self.server.server_event_queue.get(),
                 timeout=self.timeout,
             )
         except asyncio.TimeoutError:
+            self.logger.debug("Timed out waiting for client to connect")
             next_event = TimeoutEvent()
 
         if not isinstance(next_event, ClientConnectedEvent):
             raise UnexpectedEventError(ClientConnectedEvent(), next_event)
+
+        self.logger.debug("Client connected")
 
 
 class ExpectClientCalledWriterClose:
@@ -381,6 +386,7 @@ class InterceptorProtocol:
 class MockTcpServer:
 
     def __init__(self, service_port, mocker):
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.service_port = service_port
         self.mocker = mocker
         self.connected = False
@@ -483,6 +489,8 @@ class MockTcpServer:
     async def start_accepting_connections(self):
 
         def handle_client_connection(reader, writer):
+
+            self.logger.debug("client connection established")
             if self.connected:
                 self.server_event_queue.put_nowait(SecondClientConnectionAttempted())
                 return
@@ -516,6 +524,7 @@ class MockTcpServer:
             # signal that the expectation has been processed.
 
             expectation = await self.expecations_queue.get()
+            self.logger.debug("evaluating expectation: %s", expectation)
             if not self.errors:
                 # Asynchronously, we want to generate the server event that corresponds to
                 # this expectation. We have to do it asynchronously because there may already
@@ -532,13 +541,14 @@ class MockTcpServer:
     async def execute_server_actions(self):
         while True:
             server_action = await self.server_actions.get()
+            self.logger.debug("performing server action: %s", server_action)
             if self.errors:
                 # Just drop the server action. It's irrelevant now
                 continue
             try:
                 server_event = await server_action()
             except Exception as e:
-                logger.exception("Exception during server action execution")
+                # self.logger.exception("Exception during server action execution")
                 server_event = ExceptionEvent(e)
             if server_event is not None:
                 self.server_event_queue.put_nowait(server_event)
