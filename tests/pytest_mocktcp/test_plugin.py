@@ -11,6 +11,17 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.mark.asyncio()
+async def test_null_test(tcpserver):
+
+    tcpserver.expect_disconnect()
+    with pytest.raises(
+        Exception,
+        match=r"^Client is not connected. Did you forget to call `asyncio.open_connection`\?$"
+    ):
+        await tcpserver.join()
+
+
+@pytest.mark.asyncio()
 async def test_expect_connect_passes_1(tcpserver):
 
     reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
