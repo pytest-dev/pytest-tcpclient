@@ -20,3 +20,7 @@ async def test_framing(tcpserver):
 
     writer.close()
     await writer.wait_closed()
+
+    # After the connection is closed, `read_frame` should return an empty bytes
+    assert await read_frame(reader) == b""
+    assert await read_frame(reader) == b""

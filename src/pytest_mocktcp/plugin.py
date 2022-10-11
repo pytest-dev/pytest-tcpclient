@@ -23,6 +23,11 @@ class ClientConnectedEvent(ServerActionEvent):
 
 
 @dataclass
+class ClientNotConnectedEvent(ServerActionEvent):
+    pass
+
+
+@dataclass
 class SecondClientConnectionAttempted(ServerActionEvent):
     pass
 
@@ -115,6 +120,26 @@ class ExpectConnect:
 
         if not isinstance(next_event, ClientConnectedEvent):
             raise UnexpectedEventError(ClientConnectedEvent(), next_event)
+
+        self.logger.debug("Client connected")
+
+
+class ExpectIsConnected:
+
+    def __init__(self, server):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.server = server
+
+    async def server_action(self):
+        pass
+
+    async def evaluate(self):
+        # Since `server_action` does nothing, it cannot generate an error event in the
+        # case of a timeout. We have to do that here.
+
+        self.logger.debug("Expecting client to already be connected")
+        if not self.server.connected:
+            raise UnexpectedEventError(ClientConnectedEvent(), ClientNotConnectedEvent())
 
         self.logger.debug("Client connected")
 
@@ -330,6 +355,9 @@ def interpret_error(exception):
         elif isinstance(expected_event, ClientConnectedEvent):
             if isinstance(actual_event, TimeoutEvent):
                 return "Timed out waiting for client to connect"
+            elif isinstance(actual_event, ClientNotConnectedEvent):
+                return "Client is not connected. " + \
+                    "Did you forget to call `asyncio.open_connection`?"
         elif isinstance(expected_event, BytesReadEvent):
             if isinstance(actual_event, TimeoutEvent):
                 return f"Timed out waiting for {expected_event.bytes_read}"
@@ -620,6 +648,7 @@ class MockTcpServer:
 
     def expect_disconnect(self, timeout=1):
         self.check_not_stopped()
+        self.expecations_queue.put_nowait(ExpectIsConnected(self))
         self.expecations_queue.put_nowait(ExpectReadZeroBytes(self, timeout))
         self.expecations_queue.put_nowait(ExpectClientCalledWriterClose(self, timeout))
         self.expecations_queue.put_nowait(ExpectClientReadAllSentBytes(self, timeout))

@@ -14,6 +14,10 @@ export COV_CORE_SOURCE=src
 export COV_CORE_CONFIG=.coveragerc
 export COV_CORE_DATAFILE=.coverage.eager
 
+coverage erase
+
+# Have to use --cov-append here. See https://pytest-cov.readthedocs.io/en/latest/plugins.html
+
 python -m pytest \
     --log-cli-format "[%(asctime)s.%(msecs)s][%(name)s][%(funcName)s]: %(message)s" \
     --cov src --cov-report term-missing \
