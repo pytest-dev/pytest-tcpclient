@@ -236,7 +236,6 @@ class SendBytes:
 
     async def server_action(self):
         self.server.writer.write(self.data)
-        self.server.data_sent_from_server += self.data
         await self.server.writer.drain()
 
     async def evaluate(self):
@@ -417,7 +416,14 @@ class MockTcpServer:
                 return
             self.connected = True
             self.reader = reader
+
             self.writer = writer
+
+            # Capture all data sent from the server by patching `write` method of
+            # the writer
+            self.original_writer_write = self.writer.write
+            self.mocker.patch.object(self.writer, "write", self.intercept_sent_data)
+
             self.server_event_queue.put_nowait(ClientConnectedEvent())
 
         self.server = await asyncio.start_server(
@@ -425,6 +431,10 @@ class MockTcpServer:
             port=self.service_port,
             start_serving=True,
         )
+
+    def intercept_sent_data(self, data):
+        self.data_sent_from_server += data
+        self.original_writer_write(data)
 
     async def evaluate_expectations(self):
         while True:
