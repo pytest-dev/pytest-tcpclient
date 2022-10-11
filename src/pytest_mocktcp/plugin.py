@@ -161,18 +161,22 @@ class ExpectClientCalledWriterWaitClosed:
 class ExpectBytes:
 
     def __init__(self, server, expected_bytes, timeout):
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.server = server
         self.expected_bytes = expected_bytes
         self.timeout = timeout
 
     async def server_action(self):
         try:
+            self.logger.debug("Expecting to read bytes: %s", self.expected_bytes)
             received = await asyncio.wait_for(
                 self.server.reader.readexactly(len(self.expected_bytes)),
                 timeout=self.timeout,
             )
+            self.logger.debug("Bytes read: %s", received)
             return BytesReadEvent(received)
         except asyncio.TimeoutError as e:
+            self.logger.debug("Timed out waiting to read bytes %s", self.expected_bytes)
             return TimeoutEvent()
 
     async def evaluate(self):
@@ -181,23 +185,28 @@ class ExpectBytes:
             raise UnexpectedEventError(BytesReadEvent(self.expected_bytes), next_event)
         if next_event.bytes_read != self.expected_bytes:
             raise UnexpectedEventError(BytesReadEvent(self.expected_bytes), next_event)
+        self.logger.debug("Expected bytes were received: %s", self.expected_bytes)
 
 
 class ExpectFrame:
 
     def __init__(self, server, expected_payload, timeout):
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.server = server
         self.expected_payload = expected_payload
         self.timeout = timeout
 
     async def server_action(self):
         try:
+            self.logger.debug("Expecting to read frame: %s", self.expected_payload)
             payload = await asyncio.wait_for(
                 read_frame(self.server.reader),
                 timeout=self.timeout,
             )
+            self.logger.debug("Payload read: %s", payload)
             return FrameReadEvent(payload)
         except asyncio.TimeoutError as e:
+            self.logger.debug("Timed out waiting to read frame %s", self.expected_payload)
             return TimeoutEvent()
 
     async def evaluate(self):
@@ -206,6 +215,7 @@ class ExpectFrame:
             raise UnexpectedEventError(FrameReadEvent(self.expected_payload), next_event)
         if next_event.payload != self.expected_payload:
             raise UnexpectedEventError(FrameReadEvent(self.expected_payload), next_event)
+        self.logger.debug("Expected frame was received: %s", self.expected_payload)
 
 
 class ExpectReadZeroBytes:
@@ -266,10 +276,12 @@ class ExpectClientReadAllSentBytes:
 class SendBytes:
 
     def __init__(self, server, data):
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.server = server
         self.data = data
 
     async def server_action(self):
+        self.logger.debug("Sending bytes %s", self.data)
         self.server.writer.write(self.data)
         await self.server.writer.drain()
 
@@ -280,10 +292,12 @@ class SendBytes:
 class SendFrame:
 
     def __init__(self, server, payload):
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.server = server
         self.payload = payload
 
     async def server_action(self):
+        self.logger.debug("Send frame %s", self.payload)
         write_frame(self.server.writer, self.payload)
         await self.server.writer.drain()
 
