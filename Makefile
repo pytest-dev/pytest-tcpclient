@@ -1,6 +1,5 @@
 .DEFAULT_GOAL := style_and_test
 
-
 message = @echo "\033[1;38;5:123m$1\033[0m"
 
 .PHONY: verify_active_venv

@@ -335,6 +335,21 @@ class SendFrame:
         pass
 
 
+class Disconnect:
+
+    def __init__(self, server):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.server = server
+
+    async def server_action(self):
+        self.logger.debug("Server disconnecting")
+        self.server.writer.close()
+        await self.server.writer.wait_closed()
+
+    async def evaluate(self):
+        pass
+
+
 def interpret_error(exception):
 
     if isinstance(exception, UnexpectedEventError):
@@ -653,6 +668,10 @@ class MockTcpServer:
         self.expecations_queue.put_nowait(ExpectClientCalledWriterClose(self, timeout))
         self.expecations_queue.put_nowait(ExpectClientReadAllSentBytes(self, timeout))
         self.expecations_queue.put_nowait(ExpectClientCalledWriterWaitClosed(self, timeout))
+
+    def disconnect(self):
+        self.check_not_stopped()
+        self.expecations_queue.put_nowait(Disconnect(self))
 
 
 class MockTcpServerFactory:
