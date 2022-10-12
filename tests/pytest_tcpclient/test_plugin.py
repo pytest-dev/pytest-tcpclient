@@ -475,6 +475,22 @@ async def test_sent_frame_not_read_by_client(tcpserver):
 
 
 @pytest.mark.asyncio()
+async def test_server_disconnect(tcpserver):
+
+    reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
+    tcpserver.expect_connect()
+
+    tcpserver.send_frame(b"Hello")
+    assert await read_frame(reader) == b"Hello"
+
+    tcpserver.disconnect()
+    assert await read_frame(reader) == b""
+
+    writer.close()
+    await writer.wait_closed()
+
+
+@pytest.mark.asyncio()
 async def test_tcpserver_factory_second_connection_causes_failure(tcpserver_factory):
 
     server_1 = await tcpserver_factory()
