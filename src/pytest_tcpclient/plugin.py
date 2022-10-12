@@ -493,9 +493,15 @@ class MockTcpServer:
     #     return data
 
     async def client_readexactly(self, *args, **kwargs):
-        data = await self.original_client_reader_readexactly(*args, **kwargs)
-        self.data_read_by_client += data
-        return data
+        try:
+            data = await self.original_client_reader_readexactly(*args, **kwargs)
+            self.data_read_by_client += data
+            return data
+        except asyncio.IncompleteReadError as e:
+            # Have to record the bytes we did read so that we don't wrongly accuse client
+            # of not reading them.
+            self.data_read_by_client += e.partial
+            raise
 
     async def client_readuntil(self, *args, **kwargs):
         data = await self.original_client_reader_readuntil(*args, **kwargs)
