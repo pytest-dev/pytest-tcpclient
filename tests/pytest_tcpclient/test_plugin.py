@@ -491,6 +491,25 @@ async def test_server_disconnect(tcpserver):
 
 
 @pytest.mark.asyncio()
+async def test_readexactly_incomplete_read_captures_data(tcpserver):
+
+    reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
+    tcpserver.expect_connect()
+
+    tcpserver.send_bytes(b"\x00")
+    tcpserver.disconnect()
+
+    # This was causing an error because the bytes that were read were not being captured.
+    # The error wrongly claimed that the client had failed to read those bytes.
+
+    with pytest.raises(asyncio.IncompleteReadError):
+        assert await reader.readexactly(2)
+
+    writer.close()
+    await writer.wait_closed()
+
+
+@pytest.mark.asyncio()
 async def test_tcpserver_factory_second_connection_causes_failure(tcpserver_factory):
 
     server_1 = await tcpserver_factory()
