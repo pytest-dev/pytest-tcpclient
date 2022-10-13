@@ -130,3 +130,5 @@ dmypy.json
 
 # Temporary make file
 .make
+
+README.html

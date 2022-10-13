@@ -20,6 +20,7 @@ coverage erase
 
 python -m pytest \
     --log-cli-format "[%(asctime)s.%(msecs)s][%(name)s][%(funcName)s]: %(message)s" \
+    -v \
     --cov src --cov-report term-missing \
     --cov-append \
     -rf -s "${@}"

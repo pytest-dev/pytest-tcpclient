@@ -9,3 +9,4 @@ pycodestyle>=2.5.0,<3
 twine>=3.1.1
 pytest-cov>=4.0.0,<5
 build>=0.8.0
+docutils~=0.19

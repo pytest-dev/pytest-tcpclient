@@ -28,9 +28,18 @@ refresh_venv: .make/venv_refreshed
 test: refresh_venv
 	build_scripts/run_tests.sh tests
 
+.PHONY: testone
+testone: refresh_venv
+	#build_scripts/run_tests.sh tests
+	build_scripts/run_tests.sh --log-cli-level INFO --last-failed tests/pytest_tcpclient/test_plugin.py::test_expect_bytes_nothing_sent_fails_2
+
 .PHONY: testlf
 testlf: refresh_venv
 	build_scripts/run_tests.sh --log-cli-level INFO --last-failed tests
+
+.PHONY: examples
+examples: refresh_venv
+	pytest examples
 
 .PHONY: clean
 clean:
@@ -83,3 +92,11 @@ publish_to_testpypi: dist refresh_venv
 publish: dist refresh_venv
 	#build_scripts/add_version_tag
 	twine upload --repository pypi dist/*
+
+#------------------------------------------------------------------------------
+# Generating README.html for preview
+
+examples := $(wildcard examples/*)
+
+README.html: README.rst $(examples)
+	rst2html.py $< $@
