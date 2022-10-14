@@ -1,12 +1,19 @@
 #!/bin/sh
 
+set -eu
+
 if [ $(git diff HEAD --name-only | wc -l) != 0 ]; then
     echo There are uncommitted changes. Refusing to add tag.
     exit 1
 fi
 
-version=$(awk -F= '/version=/ {print $2}' setup.py | sed 's/"//g' | sed 's/,//g')
-tag=pytest-tcpclient-${version}
+if [ $(git branch --show-current) != "main" ]; then
+    echo 'Not on branch "main". Refusing to add tag.'
+    exit 1
+fi
+
+tag=$(awk -F= '/version = / {print $2}' pyproject.toml | sed 's/"//g' | sed 's/ //g')
+echo tag=${tag}
 
 git tag -a ${tag} -m ${tag}
 git push origin ${tag}
