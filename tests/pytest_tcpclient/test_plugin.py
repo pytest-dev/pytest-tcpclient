@@ -11,17 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.mark.asyncio()
-async def test_null_test(tcpserver):
-
-    tcpserver.expect_disconnect()
-    with pytest.raises(
-        Exception,
-        match=r"^Client is not connected. Did you forget to call `asyncio.open_connection`\?$"
-    ):
-        await tcpserver.join()
-
-
-@pytest.mark.asyncio()
 async def test_expect_connect_passes_1(tcpserver):
 
     reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
@@ -51,6 +40,19 @@ async def test_expect_connect_passes_2(tcpserver):
 
 
 @pytest.mark.asyncio()
+async def test_expect_connect_minimal(tcpserver):
+
+    tcpserver.expect_connect()
+
+    reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
+    writer.close()
+    await writer.wait_closed()
+
+    # `tcpserver.expect_disconnect()` is implicit
+    # `tcpserver.join()` is implicit
+
+
+@pytest.mark.asyncio()
 async def test_second_connection_causes_failure(tcpserver):
 
     reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
@@ -60,7 +62,7 @@ async def test_second_connection_causes_failure(tcpserver):
     tcpserver.expect_disconnect()
 
     with pytest.raises(
-        Exception,
+        AssertionError,
         match="^While waiting for client to disconnect a second connection was attempted$"
     ):
         await tcpserver.join()
@@ -69,7 +71,7 @@ async def test_second_connection_causes_failure(tcpserver):
 @pytest.mark.asyncio()
 async def test_expect_connect_fails(tcpserver):
     tcpserver.expect_connect(timeout=0.1)
-    with pytest.raises(Exception, match="^Timed out waiting for client to connect$"):
+    with pytest.raises(AssertionError, match="^Timed out waiting for client to connect$"):
         await tcpserver.join()
 
 
@@ -82,7 +84,7 @@ async def test_expect_disconnect_times_out(tcpserver):
     tcpserver.expect_disconnect(timeout=0.1)
 
     with pytest.raises(
-        Exception,
+        AssertionError,
         match=r"^Timed out waiting for client to disconnect. Remember to call `writer.close\(\)`.$"
     ):
         await tcpserver.join()
@@ -99,7 +101,7 @@ async def test_expect_disconnect_receives_unexpected_bytes(tcpserver):
     tcpserver.expect_disconnect(timeout=0.2)
 
     with pytest.raises(
-        Exception,
+        AssertionError,
         match=r"^Received unexpected data while waiting for client to disconnect. "
             "Data is b'Hello'.$"
     ):
@@ -140,10 +142,32 @@ async def test_expect_bytes_nothing_sent_fails(tcpserver):
     # Times out because nothing is sent
     tcpserver.expect_bytes(b"Goodbye, world", timeout=0.1)
 
-    with pytest.raises(Exception, match=r"^Timed out waiting for b'Goodbye, world'$"):
+    with pytest.raises(AssertionError, match=r"^Timed out waiting for b'Goodbye, world'$"):
         await tcpserver.join()
 
     writer.close()
+
+
+@pytest.mark.asyncio()
+async def test_expect_bytes_nothing_sent_fails_2(tcpserver):
+
+    tcpserver.expect_connect()
+    reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
+
+    tcpserver.expect_bytes(b"Hello, world")
+
+    # No `tcpserver.join()` here. The write will be closed before the server has a chance
+    # to read from the socket. This causes a different error from the previous test.
+
+    writer.close()
+    await writer.wait_closed()
+
+    with pytest.raises(
+        AssertionError,
+        match=r"^Expected to read b'Hello, world' " +
+            "but only read b'' before the connection was closed.$"
+    ):
+        await tcpserver.join()
 
 
 @pytest.mark.asyncio()
@@ -151,19 +175,19 @@ async def test_expect_bytes_wrong_bytes_fails(tcpserver):
 
     tcpserver.expect_connect()
     reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
-    await tcpserver.join()
+    # await tcpserver.join()
 
     # Passes
     tcpserver.expect_bytes(b"Hello, world")
     writer.write(b"Hello, world")
-    await tcpserver.join()
+    # await tcpserver.join()
 
     # Fails
     tcpserver.expect_bytes(b"Bonjour")
     writer.write(b"Goodbye, world")
 
     with pytest.raises(
-        Exception,
+        AssertionError,
         match="^Expected to read b'Bonjour' but actually read b'Goodbye'$"
     ):
         await tcpserver.join()
@@ -209,7 +233,7 @@ async def test_no_remaining_sent_data(tcpserver):
     tcpserver.expect_disconnect()
 
     with pytest.raises(
-        Exception,
+        AssertionError,
         match=r"^There is data sent by server that was not read by client: unread_bytes=b'Adios!'.$"
     ):
         await tcpserver.join()
@@ -232,7 +256,7 @@ async def test_readline(tcpserver):
     tcpserver.expect_disconnect()
 
     with pytest.raises(
-        Exception,
+        AssertionError,
         match=r"^There is data sent by server that was not read by client: unread_bytes=b'Two\\n'."
     ):
         await tcpserver.join()
@@ -255,7 +279,7 @@ async def test_readexactly(tcpserver):
     tcpserver.expect_disconnect()
 
     with pytest.raises(
-        Exception,
+        AssertionError,
         match=r"^There is data sent by server that was not read by client: unread_bytes=b'Two'."
     ):
         await tcpserver.join()
@@ -278,7 +302,7 @@ async def test_readuntil(tcpserver):
     tcpserver.expect_disconnect()
 
     with pytest.raises(
-        Exception,
+        AssertionError,
         match=r"^There is data sent by server that was not read by client: unread_bytes=b'BBB'."
     ):
         await tcpserver.join()
@@ -307,7 +331,7 @@ async def test_connection_reset_error(tcpserver):
     tcpserver.expect_disconnect()
 
     with pytest.raises(
-        Exception,
+        AssertionError,
         match=r"^Connection was reset. Did client close writer prematurely\?$"
     ):
         await tcpserver.join()
@@ -342,7 +366,8 @@ async def test_expect_absent_expect_connection(tcpserver):
     writer.write(b"Hello, world")
 
     with pytest.raises(
-        Exception, match=r"^Missing `expect_connect\(\)` before `expect_bytes\(b'Hello, world'\)`$"
+        AssertionError,
+        match=r"^Missing `expect_connect\(\)` before `expect_bytes\(b'Hello, world'\)`$"
     ):
         await tcpserver.join()
 
@@ -362,7 +387,9 @@ async def test_early_error_doesnt_hang_test(tcpserver):
     # expectation doesn't cause `join` below to hang. It did previously.
     writer.write(b"Adios amigo!")
 
-    with pytest.raises(Exception, match="^Expected to read b'Hello' but actually read b'Adios'$"):
+    with pytest.raises(
+        AssertionError, match="^Expected to read b'Hello' but actually read b'Adios'$"
+    ):
         await tcpserver.join()
 
 
@@ -412,7 +439,7 @@ async def test_expect_frame_nothing_sent_fails(tcpserver):
     # Times out because nothing is sent
     tcpserver.expect_frame(b"Goodbye, world", timeout=0.1)
 
-    with pytest.raises(Exception, match=r"^Timed out waiting for frame b'Goodbye, world'$"):
+    with pytest.raises(AssertionError, match=r"^Timed out waiting for frame b'Goodbye, world'$"):
         await tcpserver.join()
 
     writer.close()
@@ -434,7 +461,7 @@ async def test_expect_frame_wrong_bytes_fails(tcpserver):
     write_frame(writer, b"Goodbye, world")
 
     with pytest.raises(
-        Exception,
+        AssertionError,
         match=r"^Expected to get frame b'Bonjour' but actually got frame b'Goodbye, world'$"
     ):
         await tcpserver.join()
@@ -467,7 +494,7 @@ async def test_sent_frame_not_read_by_client(tcpserver):
     tcpserver.expect_disconnect()
 
     with pytest.raises(
-        Exception,
+        AssertionError,
         match=r"^There is data sent by server that was not read by client: "
             r"unread_bytes=b'\\x00\\x00\\x00\\x05Hello"
     ):
@@ -521,7 +548,7 @@ async def test_tcpserver_factory_second_connection_causes_failure(tcpserver_fact
     server_1.expect_disconnect()
 
     with pytest.raises(
-        Exception,
+        AssertionError,
         match="^While waiting for client to disconnect a second connection was attempted$"
     ):
         await server_1.join()
@@ -535,7 +562,7 @@ async def test_tcpserver_factory_second_connection_causes_failure(tcpserver_fact
     server_2.expect_disconnect()
 
     with pytest.raises(
-        Exception,
+        AssertionError,
         match="^While waiting for client to disconnect a second connection was attempted$"
     ):
         await server_2.join()
@@ -563,7 +590,7 @@ async def test_tcpserver_factory(tcpserver_factory):
     server_2.expect_bytes(b"Correct2")
 
     with pytest.raises(
-        Exception, match="^Expected to read b'Correct2' but actually read b'Incorrec'$"
+        AssertionError, match="^Expected to read b'Correct2' but actually read b'Incorrec'$"
     ):
         await server_1.join()
         await server_2.join()
@@ -572,7 +599,7 @@ async def test_tcpserver_factory(tcpserver_factory):
 
     server_1.expect_disconnect(timeout=0.1)
     with pytest.raises(
-        Exception,
+        AssertionError,
         match=r"^Timed out waiting for client to disconnect. Remember to call `writer.close\(\)`.$"
     ):
         await server_1.join()

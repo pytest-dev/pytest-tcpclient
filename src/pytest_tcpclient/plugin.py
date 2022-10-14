@@ -76,6 +76,12 @@ class TimeoutEvent(ServerActionEvent):
 
 
 @dataclass
+class IncompleteReadEvent(ServerActionEvent):
+
+    partial: bytes
+
+
+@dataclass
 class UnreadSentBytes(ServerActionEvent):
 
     def __init__(self, unread_bytes):
@@ -90,6 +96,9 @@ class UnexpectedEventError(Exception):
         )
         self.expected_event = expected_event
         self.actual_event = actual_event
+
+    def assertion(self):
+        assert self.actual_event == self.expected_event, interpret_error(self)
 
 
 class ExpectConnect:
@@ -208,6 +217,11 @@ class ExpectBytes:
         except asyncio.TimeoutError as e:
             self.logger.debug("Timed out waiting to read bytes %s", self.expected_bytes)
             return TimeoutEvent()
+        except asyncio.IncompleteReadError as e:
+            self.logger.debug(
+                "Incomplete read while trying to read bytes %s", self.expected_bytes
+            )
+            return IncompleteReadEvent(e.partial)
 
     async def evaluate(self):
         next_event = await self.server.server_event_queue.get()
@@ -382,6 +396,11 @@ def interpret_error(exception):
             elif isinstance(actual_event, BytesReadEvent):
                 return f"Expected to read {expected_event.bytes_read} " + \
                         f"but actually read {actual_event.bytes_read}"
+            elif isinstance(actual_event, IncompleteReadEvent):
+                if not actual_event.partial:
+                    return f"Expected to read {expected_event.bytes_read} " + \
+                            f"but only read {actual_event.partial} " + \
+                            f"before the connection was closed."
         elif isinstance(expected_event, FrameReadEvent):
             if isinstance(actual_event, TimeoutEvent):
                 return f"Timed out waiting for frame {expected_event.payload}"
@@ -637,7 +656,8 @@ class MockTcpServer:
 
         if self.errors:
             self.join_already_failed = True
-            raise Exception(interpret_error(self.errors[0]))
+            self.errors[0].assertion()
+            # raise Exception(interpret_error(self.errors[0]))
 
     def check_not_stopped(self):
         if self.stopped:
