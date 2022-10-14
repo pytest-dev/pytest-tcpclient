@@ -29,21 +29,3 @@ Having established a connection, we expect the client to send messages:
 
 .. include:: examples/test_hello_world.py
    :code: python
-
-Dev Setup
----------
-
-First initialise and activate virtual environment:
-
-.. code-block:: sh
-
-    $ ./scripts/init_venv
-    $ source venv/bin/activate
-
-
-Next, make the project:
-
-
-.. code-block:: sh
-
-    $ make

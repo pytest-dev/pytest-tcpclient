@@ -1,5 +1,8 @@
 .DEFAULT_GOAL := style_and_test
 
+PYPY_README := pypi/README.rst
+GITHUB_README := .github/README.rst
+
 message = @echo "\033[1;38;5:123m$1\033[0m"
 
 .PHONY: verify_active_venv
@@ -21,29 +24,28 @@ style_and_test:
 	$(MAKE) style
 	$(MAKE) test
 
-.PHONY: refresh_venv
-refresh_venv: .make/venv_refreshed
+.PHONY: refresh_env
+refresh_env: .make/venv_refreshed $(GITHUB_README)
 
 .PHONY: test
-test: refresh_venv
+test: refresh_env
 	build_scripts/run_tests.sh tests
 
 .PHONY: testone
-testone: refresh_venv
-	#build_scripts/run_tests.sh tests
-	build_scripts/run_tests.sh --log-cli-level INFO --last-failed tests/pytest_tcpclient/test_plugin.py::test_expect_bytes_nothing_sent_fails_2
+testone: refresh_env
+	pytest --log-cli-level INFO --last-failed tests/pytest_tcpclient/test_plugin.py::test_second_connection_causes_failure
 
 .PHONY: testlf
-testlf: refresh_venv
+testlf: refresh_env
 	build_scripts/run_tests.sh --log-cli-level INFO --last-failed tests
 
-.PHONY: examples
-examples: refresh_venv
+.PHONY: run_examples
+run_examples: refresh_env
 	pytest examples
 
 .PHONY: clean
 clean:
-	rm -rf dist .pytest_cache .tox .make .coverage
+	rm -rf build dist .pytest_cache .tox .make .coverage docs
 	find . -name __pycache__ | xargs rm -rf
 	find . -name '*.egg-info' | xargs rm -rf
 
@@ -52,7 +54,7 @@ distclean: clean
 	rm -rf venv
 
 .PHONY: style
-style: refresh_venv
+style: refresh_env
 	pycodestyle src tests
 
 #------------------------------------------------------------------------------
@@ -61,10 +63,10 @@ style: refresh_venv
 tox_initialised := .make/tox_initialised
 
 .PHONY: tox
-tox: ${tox_initialised} refresh_venv
+tox: ${tox_initialised} refresh_env
 	tox
 
-${tox_initialised}: tox.ini refresh_venv
+${tox_initialised}: tox.ini refresh_env
 	$(call message,Building tox environment...)
 	mkdir -p ${@D}
 	tox -r --notest
@@ -74,29 +76,49 @@ ${tox_initialised}: tox.ini refresh_venv
 # distribution
 
 .PHONY: dist
-dist: setup.cfg setup.py refresh_venv
+dist: setup.cfg setup.py ${PYPY_README} refresh_env
 	-rm -rf dist
-	$(call message,"Building distributions...")
+	$(call message,Building distributions...)
 	python3 -m build
 
 #------------------------------------------------------------------------------
 # testpypi
 .PHONY: publish_to_testpypi
-publish_to_testpypi: dist refresh_venv
-	#build_scripts/add_version_tag
+publish_to_testpypi: dist refresh_env
+	$(call message,Publishing to testpypi...)
 	twine upload --repository testpypi dist/*
 
 #------------------------------------------------------------------------------
 # pypi
 .PHONY: publish
-publish: dist refresh_venv
-	#build_scripts/add_version_tag
+publish: dist refresh_env
+	$(call message,Publishing to pypi...)
 	twine upload --repository pypi dist/*
+
+#------------------------------------------------------------------------------
+# Example files
+
+example_files := $(shell find examples)
 
 #------------------------------------------------------------------------------
 # Generating README.html for preview
 
-examples := $(wildcard examples/*)
-
-README.html: README.rst $(examples)
+README.html: README.rst $(example_files)
+	$(call message,Generating $@...)
 	rst2html.py $< $@
+
+#------------------------------------------------------------------------------
+# `pypi` and `github` don't honour `include` directives. We generate a flattened
+# version of `docs/README.rst`
+
+$(PYPY_README): README.rst $(example_files)
+	$(call message,Generating $@...)
+	mkdir -p $(@D)
+	rm -f $@
+	rst_include include $< $@
+
+$(GITHUB_README): README.rst $(example_files)
+	$(call message,Generating $@...)
+	mkdir -p $(@D)
+	rm -f $@
+	rst_include include $< $@
