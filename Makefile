@@ -33,11 +33,11 @@ test: refresh_env
 
 .PHONY: testone
 testone: refresh_env
-	pytest --log-cli-level INFO --last-failed tests/pytest_tcpclient/test_plugin.py::test_second_connection_causes_failure
+	build_scripts/run_tests.sh tests/pytest_tcpclient/test_plugin.py::test_second_connection_causes_failure
 
 .PHONY: testlf
 testlf: refresh_env
-	build_scripts/run_tests.sh --log-cli-level INFO --last-failed tests
+	build_scripts/run_tests.sh --last-failed tests
 
 .PHONY: run_examples
 run_examples: refresh_env
