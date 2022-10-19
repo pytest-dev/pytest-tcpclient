@@ -3,6 +3,7 @@ import logging
 
 from dataclasses import dataclass
 
+import pytest
 import pytest_asyncio
 
 
@@ -97,9 +98,6 @@ class UnexpectedEventError(Exception):
         self.expected_event = expected_event
         self.actual_event = actual_event
 
-    def assertion(self):
-        assert self.actual_event == self.expected_event, interpret_error(self)
-
 
 class ExpectConnect:
 
@@ -118,13 +116,13 @@ class ExpectConnect:
         # case of a timeout. We have to do that here.
 
         try:
-            self.logger.debug("Expecting connection from client")
+            self.logger.debug("Expecting connection from client.")
             next_event = await asyncio.wait_for(
                 self.server.server_event_queue.get(),
                 timeout=self.timeout,
             )
         except asyncio.TimeoutError:
-            self.logger.debug("Timed out waiting for client to connect")
+            self.logger.debug("Timed out waiting for client to connect.")
             next_event = TimeoutEvent()
 
         if not isinstance(next_event, ClientConnectedEvent):
@@ -371,7 +369,8 @@ def interpret_error(exception):
         actual_event = exception.actual_event
         if isinstance(expected_event, ReadZeroBytes):
             if isinstance(actual_event, SecondClientConnectionAttempted):
-                return "While waiting for client to disconnect a second connection was attempted"
+                return "While waiting for client to disconnect a " + \
+                    "second connection was attempted."
             elif isinstance(actual_event, TimeoutEvent):
                 return "Timed out waiting for client to disconnect. " + \
                         "Remember to call `writer.close()`."
@@ -383,7 +382,7 @@ def interpret_error(exception):
                     return "Connection was reset. Did client close writer prematurely?"
         elif isinstance(expected_event, ClientConnectedEvent):
             if isinstance(actual_event, TimeoutEvent):
-                return "Timed out waiting for client to connect"
+                return "Timed out waiting for client to connect."
             elif isinstance(actual_event, ClientNotConnectedEvent):
                 return "Client is not connected. " + \
                     "Did you forget to call `asyncio.open_connection`?"
@@ -647,6 +646,7 @@ class MockTcpServer:
             await self.server.wait_closed()
 
     async def join(self):
+        __tracebackhide__ = True
 
         if self.join_already_failed:
             return
@@ -656,8 +656,7 @@ class MockTcpServer:
 
         if self.errors:
             self.join_already_failed = True
-            self.errors[0].assertion()
-            # raise Exception(interpret_error(self.errors[0]))
+            pytest.fail(interpret_error(self.errors[0]))
 
     def check_not_stopped(self):
         if self.stopped:

@@ -26,3 +26,6 @@ classifiers = [
 
 [project.entry-points.pytest11]
 tcpclient = "pytest_tcpclient.plugin"
+
+[tool.pytest.ini_options]
+pytester_example_dir = "new_examples"
