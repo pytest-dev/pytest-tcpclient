@@ -232,3 +232,8 @@ def test_tcpserver_factory_two_servers_one_fails(pytester):
         "Expected to get frame b'Client hello 2' but actually got frame b''",
         server_variable_name="server_2",
     )
+
+
+def test_hello(pytester):
+    pytester.copy_example("test_hello.py")
+    pytester.runpytest().assert_outcomes(passed=1)
