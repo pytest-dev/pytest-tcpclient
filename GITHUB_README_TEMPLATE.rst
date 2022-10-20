@@ -1,15 +1,16 @@
 pytest-tcpclient
 ================
 
+
 ``pytest-tcpclient`` is a ``pytest`` plugin that helps you write better TCP clients.
 
-It provides two fixtures, `tcpserver` and `tcpserver_factory`.
+It provides two fixtures, ``tcpserver`` and ``tcpserver_factory``.
 
-Behind the scenes, the `tcpserver` fixture creates an in-process TCP server
+Behind the scenes, the ``tcpserver`` fixture creates an in-process TCP server
 that listens on a port to which the client can connect and send messages and
 from which it can receive replies.
 
-The `tcpserver` fixture is used to express expectations about what messages the
+The ``tcpserver`` fixture is used to express expectations about what messages the
 client sends and also to send replies to it. If any expectation is unfulfilled, the
 test will fail with a diagnostic message.
 

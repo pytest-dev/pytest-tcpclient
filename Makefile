@@ -28,15 +28,15 @@ style_and_test:
 refresh_env: .make/venv_refreshed
 
 .PHONY: test
-test: refresh_env
+test: | refresh_env
 	build_scripts/run_tests.sh tests
 
 .PHONY: testone
-testone: refresh_env
+testone: | refresh_env
 	build_scripts/run_tests.sh tests/pytest_tcpclient/test_plugin.py::test_second_connection_causes_failure
 
 .PHONY: testlf
-testlf: refresh_env
+testlf: | refresh_env
 	build_scripts/run_tests.sh --last-failed tests
 
 .PHONY: run_examples
@@ -55,7 +55,7 @@ distclean: clean
 	rm -rf venv
 
 .PHONY: style
-style: refresh_env
+style: | refresh_env
 	pycodestyle src tests
 
 #------------------------------------------------------------------------------
@@ -64,10 +64,10 @@ style: refresh_env
 tox_initialised := .make/tox_initialised
 
 .PHONY: tox
-tox: ${tox_initialised} refresh_env
+tox: ${tox_initialised} | refresh_env
 	tox
 
-${tox_initialised}: tox.ini refresh_env
+${tox_initialised}: tox.ini | refresh_env
 	$(call message,Building tox environment...)
 	mkdir -p ${@D}
 	tox -r --notest
@@ -77,22 +77,23 @@ ${tox_initialised}: tox.ini refresh_env
 # distribution
 
 .PHONY: dist
-dist: setup.cfg setup.py $(GITHUB_README_RST) refresh_env
+dist: setup.cfg setup.py $(GITHUB_README_RST) | refresh_env
 	-rm -rf dist
 	$(call message,Building distributions...)
 	python3 -m build
+	twine check dist/*
 
 #------------------------------------------------------------------------------
 # testpypi
 .PHONY: publish_to_testpypi
-publish_to_testpypi: dist refresh_env
+publish_to_testpypi: dist | refresh_env
 	$(call message,Publishing to testpypi...)
 	twine upload --repository testpypi dist/*
 
 #------------------------------------------------------------------------------
 # pypi
 .PHONY: publish
-publish: dist refresh_env
+publish: dist | refresh_env
 	$(call message,Publishing to pypi...)
 	twine upload --repository pypi dist/*
 
@@ -114,18 +115,21 @@ GITHUB_README_INPUT_FILES := \
 	$(readme_example_files) \
 	$(readme_example_output_files)
 
-$(GITHUB_README_RST): $(GITHUB_README_INPUT_FILES) refresh_env
+$(GITHUB_README_RST): $(GITHUB_README_INPUT_FILES) | refresh_env
 	$(call message,Generating $@...)
 	@mkdir -p $(@D)
 	@rm -f $@
 	@rst_include include $< $@
 
-$(GITHUB_README_HTML): $(GITHUB_README_RST) refresh_env
+$(GITHUB_README_HTML): $(GITHUB_README_RST) | refresh_env
 	$(call message,Generating $@...)
 	@rst2html.py $< $@
 
-examples_output/%.txt: examples/%.py refresh_env
+examples_output/%.txt: examples/%.py | refresh_env
 	$(call message,Generating $@...)
 	@mkdir -p $(@D)
 	@# The following construct is to ignore and suppress deliberate test errors
 	@pytest $< > $@ || true
+
+.PHONY: readme
+readme: $(GITHUB_README_RST)
