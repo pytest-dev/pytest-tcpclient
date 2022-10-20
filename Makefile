@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := style_and_test
 
-PYPY_README := pypi/README.rst
-GITHUB_README := .github/README.rst
+GITHUB_README_RST := .github/README.rst
+GITHUB_README_HTML := .github/README.html
 
 message = @echo "\033[1;38;5:123m$1\033[0m"
 
@@ -25,7 +25,7 @@ style_and_test:
 	$(MAKE) test
 
 .PHONY: refresh_env
-refresh_env: .make/venv_refreshed $(GITHUB_README)
+refresh_env: .make/venv_refreshed
 
 .PHONY: test
 test: refresh_env
@@ -45,9 +45,10 @@ run_examples: refresh_env
 
 .PHONY: clean
 clean:
-	rm -rf build dist .pytest_cache .tox .make .coverage docs
+	rm -rf build dist .pytest_cache .tox .make .coverage examples_output
 	find . -name __pycache__ | xargs rm -rf
 	find . -name '*.egg-info' | xargs rm -rf
+	$(MAKE) -C docs clean
 
 .PHONY: distclean
 distclean: clean
@@ -76,7 +77,7 @@ ${tox_initialised}: tox.ini refresh_env
 # distribution
 
 .PHONY: dist
-dist: setup.cfg setup.py ${PYPY_README} refresh_env
+dist: setup.cfg setup.py $(GITHUB_README_RST) refresh_env
 	-rm -rf dist
 	$(call message,Building distributions...)
 	python3 -m build
@@ -96,29 +97,35 @@ publish: dist refresh_env
 	twine upload --repository pypi dist/*
 
 #------------------------------------------------------------------------------
-# Example files
+# html
+.PHONY: html
+html:
+	$(MAKE) -C docs html
 
-example_files := $(shell find examples)
+readme_example_files := \
+	examples/test_hello.py \
+	examples/test_expect_bytes_times_out.py
 
-#------------------------------------------------------------------------------
-# Generating README.html for preview
+readme_example_output_files := \
+	$(patsubst examples/%.py,examples_output/%.txt,$(readme_example_files))
 
-README.html: README.rst $(example_files)
+GITHUB_README_INPUT_FILES := \
+	GITHUB_README_TEMPLATE.rst \
+	$(readme_example_files) \
+	$(readme_example_output_files)
+
+$(GITHUB_README_RST): $(GITHUB_README_INPUT_FILES) refresh_env
 	$(call message,Generating $@...)
-	rst2html.py $< $@
+	@mkdir -p $(@D)
+	@rm -f $@
+	@rst_include include $< $@
 
-#------------------------------------------------------------------------------
-# `pypi` and `github` don't honour `include` directives. We generate a flattened
-# version of `docs/README.rst`
-
-$(PYPY_README): README.rst $(example_files)
+$(GITHUB_README_HTML): $(GITHUB_README_RST) refresh_env
 	$(call message,Generating $@...)
-	mkdir -p $(@D)
-	rm -f $@
-	rst_include include $< $@
+	@rst2html.py $< $@
 
-$(GITHUB_README): README.rst $(example_files)
+examples_output/%.txt: examples/%.py refresh_env
 	$(call message,Generating $@...)
-	mkdir -p $(@D)
-	rm -f $@
-	rst_include include $< $@
+	@mkdir -p $(@D)
+	@# The following construct is to ignore and suppress deliberate test errors
+	@pytest $< > $@ || true

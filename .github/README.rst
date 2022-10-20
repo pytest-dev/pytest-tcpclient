@@ -1,76 +1,22 @@
 pytest-tcpclient
 ================
 
-``pytest-tcpclient`` is a ``pytest`` plugin for testing TCP clients with server
-mocking.
+``pytest-tcpclient`` is a ``pytest`` plugin that helps you write better TCP clients.
 
-The `tcpserver` is th API to the plugin. When the `tcpserver` fixture is used a
-minimal TCP server is established and will start listening on a port on the
-host machine. The port number is available via the `tcpserver.service_port`
-attribute. The server is running in the same process as the test case using
-`asyncio`.
+It provides two fixtures, `tcpserver` and `tcpserver_factory`.
 
-The `tcpserver` fixture is used to "program" the server with expectations and
-to send replies to the client.
+Behind the scenes, the `tcpserver` fixture creates an in-process TCP server
+that listens on a port to which the client can connect and send messages and
+from which it can receive replies.
 
-A minimal test
---------------
+The `tcpserver` fixture is used to express expectations about what messages the
+client sends and also to send replies to it. If any expectation is unfulfilled, the
+test will fail with a diagnostic message.
 
-The simplest example of a passing test is as follows (please take note of the
-comments in the code):
+Hello!
+------
 
-.. code-block:: python
-
-    import asyncio
-    import pytest
-
-    @pytest.mark.asyncio()
-    async def test_expect_connect(tcpserver):
-
-        # When we enter the test, the test server is already running and waiting
-        # for a connection from the client. It is running in an `asyncio.Task`.
-        #
-        # It is listening on port `tcpserver.service_port` on the local machine
-
-        # ==========================================================================
-        # Initially, we tell the server what we're expecting the client to do. In
-        # this case, we expect the client to connect and then to immediately
-        # disconnect.
-
-        tcpserver.expect_connect()
-        tcpserver.expect_disconnect()
-
-        # In all tests, the first expectation must be `expect_connect`. An error
-        # will be raised if this is not the case. The final one should be
-        # `expect_disconnect`.
-        #
-        # Behind the scenes, the server will record the _actual_ interactions with
-        # the client and compare them to the expectations. It records the
-        # outcomes of those comparisons asynchronously. When `tcpserver.join` is
-        # called (below), errors will be raised if they occurred.
-
-        # ==========================================================================
-        # Having specifiied the expectations, the client now interacts with
-        # the server.
-
-        # This is the connection expected by the server. Note that `host` is `None.
-        reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
-
-        # Here's the disconnection expected by the server. Both `close` and `wait_closed`
-        # are required to complete the disconnection.
-        writer.close()
-        await writer.wait_closed()
-
-        # =========================================================================
-        # Finally, `join` with the server. If there is an unfulfilled expectation or
-        # some other error, this function will raise an exception.
-
-        await tcpserver.join()
-
-Hello, world!
--------------
-
-Having established a connection, we expect the client to send messages:
+Here's an example of a passing test that uses the `tcpserver` fixture:
 
 .. code-block:: python
 
@@ -79,25 +25,137 @@ Having established a connection, we expect the client to send messages:
 
 
     @pytest.mark.asyncio()
-    async def test_hello_world(tcpserver):
+    async def test_hello(tcpserver):
 
         # ==========================================================================
-        # Establish expectations on server side
+        # Establish expectations and replies on the server side.
+        #
+        # In this case, the client is expected to connect and then send a specific
+        # message. If that occurs, the server will send a reply. It is expected
+        # that the client will then disconnect.
 
         tcpserver.expect_connect()
-        tcpserver.expect_bytes(b"Hello, world")
+        tcpserver.expect_bytes(b"Hello, server!")
+        tcpserver.send_bytes(b"Hello, client!")
         tcpserver.expect_disconnect()
 
         # ==========================================================================
-        # Client connects, sends a message and then disconnects
+        # Client interacts with server.
+        #
+        # It connects, sends the expected message and then receives the reply.
+        # Finally, it disconnects from the server.
 
         reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
-        writer.write(b"Hello, world")
+
+        writer.write(b"Hello, server!")
+        assert await reader.readexactly(14) == b"Hello, client!"
+
         writer.close()
         await writer.wait_closed()
 
         # ==========================================================================
-        # Synchronise results
+        # Synchronise with server. Test failures, if any, will be reported here. In
+        # this case, there are no failures.
 
         await tcpserver.join()
+
+Here's the result:
+
+.. code-block:: python
+
+    ============================= test session starts ==============================
+    platform linux -- Python 3.8.10, pytest-7.1.3, pluggy-1.0.0
+    rootdir: /home/anders/src/pytest-tcpclient, configfile: pyproject.toml
+    plugins: mock-3.10.0, asyncio-0.19.0, cov-4.0.0, tcpclient-0.7.14
+    asyncio: mode=strict
+    collected 1 item
+
+    examples/test_hello.py .                                                 [100%]
+
+    ============================== 1 passed in 0.02s ===============================
+
+Test Failure
+------------
+
+This example demonstrates test failure.
+
+It is similar to the previous example except that the client does not send the
+expected message. As a result, the server times out while waiting for that
+message and the test fails.
+
+.. code-block:: python
+
+    import asyncio
+    import pytest
+
+
+    @pytest.mark.asyncio()
+    async def test_expect_bytes_times_out(tcpserver):
+
+        # --------------------------------------------------------------------------
+        # Server expectations. The server just expects the client to connect, send
+        # a message and then disconnect.
+
+        tcpserver.expect_connect()
+        tcpserver.expect_bytes(b"Hello, world!")
+        tcpserver.expect_disconnect()
+
+        # --------------------------------------------------------------------------
+        # The client connects but it does not send the message and it does not close
+        # the connection.
+
+        reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
+
+        # --------------------------------------------------------------------------
+        # The server will time out waiting for the expected message. The test will
+        # fail with a diagnostic message.
+
+        await tcpserver.join()
+
+Here's the result:
+
+.. code-block:: python
+
+    ============================= test session starts ==============================
+    platform linux -- Python 3.8.10, pytest-7.1.3, pluggy-1.0.0
+    rootdir: /home/anders/src/pytest-tcpclient, configfile: pyproject.toml
+    plugins: mock-3.10.0, asyncio-0.19.0, cov-4.0.0, tcpclient-0.7.14
+    asyncio: mode=strict
+    collected 1 item
+
+    examples/test_expect_bytes_times_out.py F                                [100%]
+
+    =================================== FAILURES ===================================
+    _________________________ test_expect_bytes_times_out __________________________
+
+    tcpserver = <pytest_tcpclient.plugin.MockTcpServer object at 0x7fd136eb1bb0>
+
+        @pytest.mark.asyncio()
+        async def test_expect_bytes_times_out(tcpserver):
+
+            # --------------------------------------------------------------------------
+            # Server expectations. The server just expects the client to connect, send
+            # a message and then disconnect.
+
+            tcpserver.expect_connect()
+            tcpserver.expect_bytes(b"Hello, world!")
+            tcpserver.expect_disconnect()
+
+            # --------------------------------------------------------------------------
+            # The client connects but it does not send the message and it does not close
+            # the connection.
+
+            reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
+
+            # --------------------------------------------------------------------------
+            # The server will time out waiting for the expected message. The test will
+            # fail with a diagnostic message.
+
+    >       await tcpserver.join()
+    E       Failed: Timed out waiting for b'Hello, world!'
+
+    examples/test_expect_bytes_times_out.py:26: Failed
+    =========================== short test summary info ============================
+    FAILED examples/test_expect_bytes_times_out.py::test_expect_bytes_times_out
+    ============================== 1 failed in 1.03s ===============================
 

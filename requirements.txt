@@ -12,3 +12,5 @@ pytest-cov>=4.0.0,<5
 build>=0.8.0
 docutils~=0.19
 rst-include~=2.1
+sphinx~=5.2
+pygments-pytest~=2.2
