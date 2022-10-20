@@ -95,7 +95,7 @@ publish_to_testpypi: dist | refresh_env
 .PHONY: publish
 publish: dist | refresh_env
 	$(call message,Publishing to pypi...)
-	twine upload --repository pypi dist/*
+	twine upload --verbose --repository pypi dist/*
 
 #------------------------------------------------------------------------------
 # html
