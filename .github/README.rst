@@ -128,7 +128,7 @@ Here's the result:
     =================================== FAILURES ===================================
     _________________________ test_expect_bytes_times_out __________________________
 
-    tcpserver = <pytest_tcpclient.plugin.MockTcpServer object at 0x7fd136eb1bb0>
+    tcpserver = <pytest_tcpclient.plugin.MockTcpServer object at 0x7fd103b50c70>
 
         @pytest.mark.asyncio()
         async def test_expect_bytes_times_out(tcpserver):
