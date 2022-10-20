@@ -1,15 +1,16 @@
 pytest-tcpclient
 ================
 
+
 ``pytest-tcpclient`` is a ``pytest`` plugin that helps you write better TCP clients.
 
-It provides two fixtures, `tcpserver` and `tcpserver_factory`.
+It provides two fixtures, ``tcpserver`` and ``tcpserver_factory``.
 
-Behind the scenes, the `tcpserver` fixture creates an in-process TCP server
+Behind the scenes, the ``tcpserver`` fixture creates an in-process TCP server
 that listens on a port to which the client can connect and send messages and
 from which it can receive replies.
 
-The `tcpserver` fixture is used to express expectations about what messages the
+The ``tcpserver`` fixture is used to express expectations about what messages the
 client sends and also to send replies to it. If any expectation is unfulfilled, the
 test will fail with a diagnostic message.
 
@@ -128,7 +129,7 @@ Here's the result:
     =================================== FAILURES ===================================
     _________________________ test_expect_bytes_times_out __________________________
 
-    tcpserver = <pytest_tcpclient.plugin.MockTcpServer object at 0x7fd103b50c70>
+    tcpserver = <pytest_tcpclient.plugin.MockTcpServer object at 0x7f3ee4810b80>
 
         @pytest.mark.asyncio()
         async def test_expect_bytes_times_out(tcpserver):
@@ -157,5 +158,5 @@ Here's the result:
     examples/test_expect_bytes_times_out.py:26: Failed
     =========================== short test summary info ============================
     FAILED examples/test_expect_bytes_times_out.py::test_expect_bytes_times_out
-    ============================== 1 failed in 1.03s ===============================
+    ============================== 1 failed in 1.06s ===============================
 
