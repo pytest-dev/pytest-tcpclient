@@ -39,12 +39,21 @@ def test_expect_connect_times_out(pytester):
     assert_failure(result, "Timed out waiting for client to connect.")
 
 
-def test_expect_disconnect_times_out(pytester):
-    pytester.copy_example("test_expect_disconnect_times_out.py")
+def test_expect_disconnect_close_not_called(pytester):
+    pytester.copy_example("test_expect_disconnect_close_not_called.py")
     result = pytester.runpytest()
     assert_failure(
         result,
         "Timed out waiting for client to disconnect. Remember to call `writer.close()`."
+    )
+
+
+def test_expect_disconnect_wait_closed_not_called(pytester):
+    pytester.copy_example("test_expect_disconnect_wait_closed_not_called.py")
+    result = pytester.runpytest()
+    assert_failure(
+        result,
+        "Timed out waiting for client to call `await writer.wait_closed()`."
     )
 
 
@@ -237,3 +246,21 @@ def test_tcpserver_factory_two_servers_one_fails(pytester):
 def test_hello(pytester):
     pytester.copy_example("test_hello.py")
     pytester.runpytest().assert_outcomes(passed=1)
+
+
+def test_expect_disconnect_no_connection(pytester):
+    pytester.copy_example("test_expect_disconnect_no_connection.py")
+    result = pytester.runpytest()
+    assert_failure(
+        result,
+        "Client is not connected. Did you forget to call `asyncio.open_connection`?"
+    )
+
+
+def test_tcpserver_factory_two_servers_fail(pytester):
+    pytester.copy_example("test_tcpserver_factory_two_servers_fail.py")
+    result = pytester.runpytest()
+    result.assert_outcomes(failed=1)
+    lines = result.stdout.get_lines_after(">       await tcpserver_factory.stop()")
+    assert lines[0] == \
+        "E       Failed: Expected to read b'Hello_1' but actually read b'Hello_2'"

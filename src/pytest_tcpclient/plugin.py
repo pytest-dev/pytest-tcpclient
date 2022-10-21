@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 import pytest
 import pytest_asyncio
+from _pytest.outcomes import OutcomeException
 
 
 from .framing import read_frame, write_frame
@@ -160,28 +161,6 @@ class ExpectClientCalledWriterClose:
     async def server_action(self):
         try:
             await asyncio.wait_for(
-                self.server.client_called_writer_waited_closed.wait(),
-                timeout=self.timeout,
-            )
-            return ClientCalledWriterWaitClosed()
-        except asyncio.TimeoutError:
-            return TimeoutEvent()
-
-    async def evaluate(self):
-        next_event = await self.server.server_event_queue.get()
-        if not isinstance(next_event, ClientCalledWriterWaitClosed):
-            raise UnexpectedEventError(ClientCalledWriterWaitClosed(), next_event)
-
-
-class ExpectClientCalledWriterWaitClosed:
-
-    def __init__(self, server, timeout):
-        self.server = server
-        self.timeout = timeout
-
-    async def server_action(self):
-        try:
-            await asyncio.wait_for(
                 self.server.client_called_writer_close.wait(),
                 timeout=self.timeout,
             )
@@ -193,6 +172,28 @@ class ExpectClientCalledWriterWaitClosed:
         next_event = await self.server.server_event_queue.get()
         if not isinstance(next_event, ClientCalledWriterClose):
             raise UnexpectedEventError(ClientCalledWriterClose(), next_event)
+
+
+class ExpectClientCalledWriterWaitClosed:
+
+    def __init__(self, server, timeout):
+        self.server = server
+        self.timeout = timeout
+
+    async def server_action(self):
+        try:
+            await asyncio.wait_for(
+                self.server.client_called_writer_waited_closed.wait(),
+                timeout=self.timeout,
+            )
+            return ClientCalledWriterWaitClosed()
+        except asyncio.TimeoutError:
+            return TimeoutEvent()
+
+    async def evaluate(self):
+        next_event = await self.server.server_event_queue.get()
+        if not isinstance(next_event, ClientCalledWriterWaitClosed):
+            raise UnexpectedEventError(ClientCalledWriterWaitClosed(), next_event)
 
 
 class ExpectBytes:
@@ -266,9 +267,6 @@ class ExpectReadZeroBytes:
         self.server = server
         self.timeout = timeout
 
-    def __str__(self):
-        return f"ExpectReadZeroBytes(timeout={self.timeout})"
-
     async def server_action(self):
         try:
             received = await asyncio.wait_for(
@@ -279,8 +277,6 @@ class ExpectReadZeroBytes:
                 return ReadZeroBytes()
             else:
                 return BytesReadEvent(received)
-        except asyncio.TimeoutError:
-            return TimeoutEvent()
         except ConnectionResetError as e:
             return ReadZeroBytes()
 
@@ -297,17 +293,14 @@ class ExpectClientReadAllSentBytes:
         self.timeout = timeout
 
     async def server_action(self):
-        try:
-            sent_bytes = self.server.data_sent_from_server
-            read_bytes = self.server.data_read_by_client
-            if read_bytes == sent_bytes:
-                return NoRemainingSentData()
-            else:
-                assert sent_bytes.startswith(read_bytes), \
-                    f"sent_bytes does not start with read_bytes: {sent_bytes=}, {read_bytes=}"
-                return UnreadSentBytes(sent_bytes[len(read_bytes):])
-        except asyncio.TimeoutError:
-            return TimeoutEvent()
+        sent_bytes = self.server.data_sent_from_server
+        read_bytes = self.server.data_read_by_client
+        if read_bytes == sent_bytes:
+            return NoRemainingSentData()
+        else:
+            assert sent_bytes.startswith(read_bytes), \
+                f"sent_bytes does not start with read_bytes: {sent_bytes=}, {read_bytes=}"
+            return UnreadSentBytes(sent_bytes[len(read_bytes):])
 
     async def evaluate(self):
         next_event = await self.server.server_event_queue.get()
@@ -364,59 +357,62 @@ class Disconnect:
 
 def interpret_error(exception):
 
-    if isinstance(exception, UnexpectedEventError):
-        expected_event = exception.expected_event
-        actual_event = exception.actual_event
-        if isinstance(expected_event, ReadZeroBytes):
-            if isinstance(actual_event, SecondClientConnectionAttempted):
-                return "While waiting for client to disconnect a " + \
-                    "second connection was attempted."
-            elif isinstance(actual_event, TimeoutEvent):
-                return "Timed out waiting for client to disconnect. " + \
-                        "Remember to call `writer.close()`."
-            elif isinstance(actual_event, BytesReadEvent):
-                return "Received unexpected data while waiting for client to disconnect. " + \
-                        f"Data is {actual_event.bytes_read}."
-            elif isinstance(actual_event, ExceptionEvent):
-                if isinstance(actual_event.exception, ConnectionResetError):
-                    return "Connection was reset. Did client close writer prematurely?"
-        elif isinstance(expected_event, ClientConnectedEvent):
-            if isinstance(actual_event, TimeoutEvent):
-                return "Timed out waiting for client to connect."
-            elif isinstance(actual_event, ClientNotConnectedEvent):
-                return "Client is not connected. " + \
-                    "Did you forget to call `asyncio.open_connection`?"
-        elif isinstance(expected_event, BytesReadEvent):
-            if isinstance(actual_event, TimeoutEvent):
-                return f"Timed out waiting for {expected_event.bytes_read}"
-            elif isinstance(actual_event, ClientConnectedEvent):
-                return "Missing `expect_connect()` before " + \
-                        f"`expect_bytes({expected_event.bytes_read})`"
-            elif isinstance(actual_event, BytesReadEvent):
+    if not isinstance(exception, UnexpectedEventError):  # pragma: no cover
+        return f"Cannot interpret {exception}, {type(exception)=}"
+
+    expected_event = exception.expected_event
+    actual_event = exception.actual_event
+
+    if isinstance(expected_event, ReadZeroBytes):
+        if isinstance(actual_event, BytesReadEvent):
+            return "Received unexpected data while waiting for client to disconnect. " + \
+                    f"Data is {actual_event.bytes_read}."
+    elif isinstance(expected_event, ClientCalledWriterClose):
+        if isinstance(actual_event, SecondClientConnectionAttempted):
+            return "While waiting for client to disconnect a " + \
+                "second connection was attempted."
+        elif isinstance(actual_event, TimeoutEvent):
+            return "Timed out waiting for client to disconnect. " + \
+                    "Remember to call `writer.close()`."
+        elif isinstance(actual_event, ExceptionEvent):
+            if isinstance(actual_event.exception, ConnectionResetError):
+                return "Connection was reset. Did client close writer prematurely?"
+    elif isinstance(expected_event, ClientConnectedEvent):
+        if isinstance(actual_event, TimeoutEvent):
+            return "Timed out waiting for client to connect."
+        elif isinstance(actual_event, ClientNotConnectedEvent):
+            return "Client is not connected. " + \
+                "Did you forget to call `asyncio.open_connection`?"
+    elif isinstance(expected_event, BytesReadEvent):
+        if isinstance(actual_event, TimeoutEvent):
+            return f"Timed out waiting for {expected_event.bytes_read}"
+        elif isinstance(actual_event, ClientConnectedEvent):
+            return "Missing `expect_connect()` before " + \
+                    f"`expect_bytes({expected_event.bytes_read})`"
+        elif isinstance(actual_event, BytesReadEvent):
+            return f"Expected to read {expected_event.bytes_read} " + \
+                    f"but actually read {actual_event.bytes_read}"
+        elif isinstance(actual_event, IncompleteReadEvent):
+            if not actual_event.partial:
                 return f"Expected to read {expected_event.bytes_read} " + \
-                        f"but actually read {actual_event.bytes_read}"
-            elif isinstance(actual_event, IncompleteReadEvent):
-                if not actual_event.partial:
-                    return f"Expected to read {expected_event.bytes_read} " + \
-                            f"but only read {actual_event.partial} " + \
-                            f"before the connection was closed."
-        elif isinstance(expected_event, FrameReadEvent):
-            if isinstance(actual_event, TimeoutEvent):
-                return f"Timed out waiting for frame {expected_event.payload}"
-            # elif isinstance(actual_event, ClientConnectedEvent):
-            #     return "Missing `expect_connect()` before " + \
-            #             f"`expect_bytes({expected_event.bytes_read})`"
-            elif isinstance(actual_event, FrameReadEvent):
-                return f"Expected to get frame {expected_event.payload} " + \
-                        f"but actually got frame {actual_event.payload}"
-        elif isinstance(expected_event, ClientCalledWriterWaitClosed):
-            if isinstance(actual_event, TimeoutEvent):
-                return "Timed out waiting for client to call `await writer.wait_closed()`."
-        elif isinstance(expected_event, NoRemainingSentData):
-            if isinstance(actual_event, UnreadSentBytes):
-                return "There is data sent by server that was not read by client: " + \
-                        f"unread_bytes={actual_event.unread_bytes}."
-    return f"Cannot interpret {exception}, {type(exception)=}"
+                        f"but only read {actual_event.partial} " + \
+                        f"before the connection was closed."
+    elif isinstance(expected_event, FrameReadEvent):
+        if isinstance(actual_event, TimeoutEvent):
+            return f"Timed out waiting for frame {expected_event.payload}"
+        # elif isinstance(actual_event, ClientConnectedEvent):
+        #     return "Missing `expect_connect()` before " + \
+        #             f"`expect_bytes({expected_event.bytes_read})`"
+        elif isinstance(actual_event, FrameReadEvent):
+            return f"Expected to get frame {expected_event.payload} " + \
+                    f"but actually got frame {actual_event.payload}"
+    elif isinstance(expected_event, ClientCalledWriterWaitClosed):
+        if isinstance(actual_event, TimeoutEvent):
+            return "Timed out waiting for client to call `await writer.wait_closed()`."
+    elif isinstance(expected_event, NoRemainingSentData):
+        if isinstance(actual_event, UnreadSentBytes):
+            return "There is data sent by server that was not read by client: " + \
+                    f"unread_bytes={actual_event.unread_bytes}."
 
 
 class InterceptorProtocol:
@@ -431,10 +427,10 @@ class InterceptorProtocol:
     def connection_lost(self, exc):
         self.original_protocol.connection_lost(exc)
 
-    def pause_writing(self):
+    def pause_writing(self):  # pragma: no cover
         self.original_protocol.pause_writing()
 
-    def resume_writing(self):
+    def resume_writing(self):  # pragma: no cover
         self.original_protocol.resume_writing()
 
     def data_received(self, data):
@@ -624,6 +620,7 @@ class MockTcpServer:
         self.errors.append(exception)
 
     async def stop(self):
+        __tracebackhide__ = True
         try:
             await self.join()
         finally:
@@ -659,7 +656,7 @@ class MockTcpServer:
             pytest.fail(interpret_error(self.errors[0]))
 
     def check_not_stopped(self):
-        if self.stopped:
+        if self.stopped:  # pragma: no cover
             raise Exception("Fixture is stopped")
 
     def expect_connect(self, timeout=1):
@@ -689,10 +686,10 @@ class MockTcpServer:
     def expect_disconnect(self, timeout=1):
         self.check_not_stopped()
         self.expecations_queue.put_nowait(ExpectIsConnected(self))
-        self.expecations_queue.put_nowait(ExpectReadZeroBytes(self, timeout))
         self.expecations_queue.put_nowait(ExpectClientCalledWriterClose(self, timeout))
-        self.expecations_queue.put_nowait(ExpectClientReadAllSentBytes(self, timeout))
         self.expecations_queue.put_nowait(ExpectClientCalledWriterWaitClosed(self, timeout))
+        self.expecations_queue.put_nowait(ExpectReadZeroBytes(self, timeout))
+        self.expecations_queue.put_nowait(ExpectClientReadAllSentBytes(self, timeout))
 
     def disconnect(self):
         self.check_not_stopped()
@@ -724,10 +721,6 @@ class MockTcpServerFactory:
         return server
 
     async def intercept_open_connection(self, host, port):
-        if host is not None:
-            raise Exception(
-                f"`host` parameter to `open_connection` should be `None` but it is {host}"
-            )
         client_reader, client_writer = await self.original_open_connection(host, port)
         server = self.servers[port]
         server.register_client_streams(client_reader, client_writer)
@@ -746,13 +739,17 @@ class MockTcpServerFactory:
         )
 
     async def stop(self):
+        __tracebackhide__ = True
         errors = []
         for server in self.servers.values():
             try:
                 if not server.join_already_failed:
                     server.expect_disconnect()
                 await server.stop()
-            except Exception as e:
+            except BaseException as e:
+                # `pytest.fail` raises `_pytest.outcomes.OutcomeException` which
+                # is a subclass of `BaseException`. `OutcomeException` is not public
+                # so we can rely on it's existence.
                 errors.append(e)
         if errors:
             raise errors[0]
