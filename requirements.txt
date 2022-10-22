@@ -3,7 +3,10 @@
 # in setup.cfg
 
 ansi2html
-coverage>=5.3.1,<6
+
+# Need `toml` extra to enable configurability from `pyproject.toml`
+coverage[toml]>=5.3.1,<6
+
 pylint>=2.5.3,<3
 tox>=3.14.6,<4
 pycodestyle>=2.5.0,<3
@@ -14,3 +17,5 @@ docutils~=0.19
 rst-include~=2.1
 sphinx~=5.2
 pygments-pytest~=2.2
+setuptools>=45.0.0
+setuptools-scm~=7.0
