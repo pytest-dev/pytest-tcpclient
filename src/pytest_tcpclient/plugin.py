@@ -650,6 +650,7 @@ class MockTcpServer:
 
         if self.errors:
             self.join_already_failed = True
+            self.logger.debug("Failed: %s", interpret_error(self.errors[0]))
             pytest.fail(interpret_error(self.errors[0]))
 
     def check_not_stopped(self):
