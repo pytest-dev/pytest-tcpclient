@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pytest-tcpclient"
-version = "0.7.18.dev4511107"
+version = "0.7.18.dev16689941"
 license.file = "LICENSE"
 authors = [
     { name="Anders Lindstrom", email="anders@anderslindstrom.com"},
