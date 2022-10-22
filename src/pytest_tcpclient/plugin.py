@@ -411,7 +411,7 @@ def interpret_error(exception):
             return "There is data sent by server that was not read by client: " + \
                     f"unread_bytes={actual_event.unread_bytes}."
 
-    return f"Cannot interpret {exception}, {type(exception)=}"
+    return f"Cannot interpret {exception}, {type(exception)=}"  # pragma: no cover
 
 
 class InterceptorProtocol:

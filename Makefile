@@ -29,7 +29,7 @@ refresh_env: .make/venv_refreshed
 
 .PHONY: test
 test: | refresh_env
-	build_scripts/run_tests.sh --log-cli-level DEBUG tests
+	build_scripts/run_tests.sh tests
 
 .PHONY: testone
 testone: | refresh_env
