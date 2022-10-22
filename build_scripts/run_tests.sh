@@ -24,5 +24,6 @@ python -m pytest \
     --color=yes \
     --log-cli-format "[%(asctime)s.%(msecs)s][%(name)s][%(funcName)s]: %(message)s" \
     --cov src --cov-report term-missing --cov-append \
+    --cov-fail-under 100 \
     -rf \
     "${@}"
