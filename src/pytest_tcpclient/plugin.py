@@ -11,9 +11,6 @@ from _pytest.outcomes import OutcomeException
 from .framing import read_frame, write_frame
 
 
-logger = logging.getLogger(__name__)
-
-
 @dataclass
 class ServerActionEvent:
     pass
@@ -414,6 +411,8 @@ def interpret_error(exception):
             return "There is data sent by server that was not read by client: " + \
                     f"unread_bytes={actual_event.unread_bytes}."
 
+    return f"Cannot interpret {exception}, {type(exception)=}"  # pragma: no cover
+
 
 class InterceptorProtocol:
 
@@ -611,7 +610,6 @@ class MockTcpServer:
             try:
                 server_event = await server_action()
             except Exception as e:
-                # self.logger.exception("Exception during server action execution")
                 server_event = ExceptionEvent(e)
             if server_event is not None:
                 self.server_event_queue.put_nowait(server_event)
@@ -699,6 +697,7 @@ class MockTcpServer:
 class MockTcpServerFactory:
 
     def __init__(self, unused_tcp_port_factory, mocker):
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.unused_tcp_port_factory = unused_tcp_port_factory
         self.mocker = mocker
         self.servers = {}
