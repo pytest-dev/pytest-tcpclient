@@ -11,9 +11,6 @@ from _pytest.outcomes import OutcomeException
 from .framing import read_frame, write_frame
 
 
-logger = logging.getLogger(__name__)
-
-
 @dataclass
 class ServerActionEvent:
     pass
@@ -699,6 +696,7 @@ class MockTcpServer:
 class MockTcpServerFactory:
 
     def __init__(self, unused_tcp_port_factory, mocker):
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.unused_tcp_port_factory = unused_tcp_port_factory
         self.mocker = mocker
         self.servers = {}
@@ -747,11 +745,13 @@ class MockTcpServerFactory:
                     server.expect_disconnect()
                 await server.stop()
             except BaseException as e:
+                self.logger.exception("Exception while stopping factory")
                 # `pytest.fail` raises `_pytest.outcomes.OutcomeException` which
                 # is a subclass of `BaseException`. `OutcomeException` is not public
                 # so we can rely on it's existence.
                 errors.append(e)
         if errors:
+            self.logger.debug("Raising error %s", errors[0])
             raise errors[0]
 
 
