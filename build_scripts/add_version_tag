@@ -2,10 +2,10 @@
 
 set -eu
 
-if [ $(git branch --show-current) != "main" ]; then
-    echo 'Not on branch "main". Refusing to add tag.'
-    exit 1
-fi
+#if [ $(git branch --show-current) != "main" ]; then
+#    echo 'Not on branch "main". Refusing to add tag.'
+#    exit 1
+#fi
 
 if [ $(git diff HEAD --name-only | wc -l) != 0 ]; then
     echo There are uncommitted changes. Refusing to add tag.
