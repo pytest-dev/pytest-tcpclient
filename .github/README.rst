@@ -67,7 +67,7 @@ Here's the result:
     ============================= test session starts ==============================
     platform linux -- Python 3.8.10, pytest-7.1.3, pluggy-1.0.0
     rootdir: /home/anders/src/pytest-tcpclient, configfile: pyproject.toml
-    plugins: mock-3.10.0, asyncio-0.19.0, cov-4.0.0, tcpclient-0.7.14
+    plugins: mock-3.10.0, asyncio-0.20.1, cov-4.0.0, tcpclient-0.7.19.dev3+g18bdd9c.d20221023
     asyncio: mode=strict
     collected 1 item
 
@@ -120,7 +120,7 @@ Here's the result:
     ============================= test session starts ==============================
     platform linux -- Python 3.8.10, pytest-7.1.3, pluggy-1.0.0
     rootdir: /home/anders/src/pytest-tcpclient, configfile: pyproject.toml
-    plugins: mock-3.10.0, asyncio-0.19.0, cov-4.0.0, tcpclient-0.7.14
+    plugins: mock-3.10.0, asyncio-0.20.1, cov-4.0.0, tcpclient-0.7.19.dev3+g18bdd9c.d20221023
     asyncio: mode=strict
     collected 1 item
 
@@ -129,7 +129,7 @@ Here's the result:
     =================================== FAILURES ===================================
     _________________________ test_expect_bytes_times_out __________________________
 
-    tcpserver = <pytest_tcpclient.plugin.MockTcpServer object at 0x7f3ee4810b80>
+    tcpserver = <pytest_tcpclient.plugin.MockTcpServer object at 0x7f00c2575c70>
 
         @pytest.mark.asyncio()
         async def test_expect_bytes_times_out(tcpserver):
@@ -158,5 +158,5 @@ Here's the result:
     examples/test_expect_bytes_times_out.py:26: Failed
     =========================== short test summary info ============================
     FAILED examples/test_expect_bytes_times_out.py::test_expect_bytes_times_out
-    ============================== 1 failed in 1.06s ===============================
+    ============================== 1 failed in 1.07s ===============================
 
