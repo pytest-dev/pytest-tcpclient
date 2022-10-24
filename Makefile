@@ -14,8 +14,7 @@ verify_active_venv:
 	fi
 
 .make/venv_refreshed: pyproject.toml dev_dependencies.txt | verify_active_venv
-	python -m pip install ".[dev]"
-	python -m pip install -e .
+	python -m pip install -e .[dev]
 	mkdir -p ${@D}
 	touch $@
 
