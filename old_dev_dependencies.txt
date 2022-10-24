@@ -17,5 +17,3 @@ docutils~=0.19
 rst-include~=2.1
 sphinx~=5.2
 pygments-pytest~=2.2
-setuptools>=45.0.0
-setuptools-scm~=7.0

@@ -13,8 +13,8 @@ verify_active_venv:
 		exit 1; \
 	fi
 
-.make/venv_refreshed: setup.cfg pyproject.toml requirements.txt | verify_active_venv
-	python -m pip install -v -r requirements.txt
+.make/venv_refreshed: setup.cfg pyproject.toml dev_dependencies.txt | verify_active_venv
+	python -m pip install -v ".[dev]"
 	python -m pip install -v -e .
 	mkdir -p ${@D}
 	touch $@
