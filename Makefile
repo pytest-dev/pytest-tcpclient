@@ -13,9 +13,9 @@ verify_active_venv:
 		exit 1; \
 	fi
 
-.make/venv_refreshed: setup.cfg pyproject.toml dev_dependencies.txt | verify_active_venv
-	python -m pip install -v ".[dev]"
-	python -m pip install -v -e .
+.make/venv_refreshed: pyproject.toml dev_dependencies.txt | verify_active_venv
+	python -m pip install ".[dev]"
+	python -m pip install -e .
 	mkdir -p ${@D}
 	touch $@
 
@@ -77,7 +77,7 @@ ${tox_initialised}: tox.ini | refresh_env
 # distribution
 
 .PHONY: dist
-dist: setup.cfg setup.py $(GITHUB_README_RST) | refresh_env
+dist: setup.py $(GITHUB_README_RST) | refresh_env
 	-rm -rf dist
 	$(call message,Building distributions...)
 	python3 -m build
