@@ -18,6 +18,10 @@ jobs:
           with:
             python-version: ${{ matrix.python-version }}
         - name: Run tox
-          run: make tox
+          run: tox -e py
+        - name: Build dist
+          run: python -m build
+        - name: Check build
+          run: twine check dist/*
         - name: Publish
-          run: make publish
+          run: twine upload --repository testpypi dist/*
