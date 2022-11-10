@@ -2,6 +2,11 @@
 Changelog
 =========
 
+0.7.25 (2022-11-11)
+===================
+
+Fixed formatting in `CHANGELOG.rst` and `GITHUB_README_TEMPLATE.rst`
+
 0.7.24 (2022-11-11)
 ===================
 
