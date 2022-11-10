@@ -17,7 +17,7 @@ test will fail with a diagnostic message.
 Hello!
 ------
 
-Here's an example of a passing test that uses the `tcpserver` fixture:
+Here's an example of a passing test that uses the ``tcpserver`` fixture:
 
 .. include:: examples/test_hello.py
     :code: python
