@@ -2,6 +2,13 @@
 Changelog
 =========
 
+0.7.24 (2022-11-11)
+===================
+
+Adding `CHANGELOG.rst`
+
+- Closes `https://github.com/andersglindstrom/pytest-tcpclient/issues/65`
+
 0.7.23 (2022-11-11)
 ===================
 
