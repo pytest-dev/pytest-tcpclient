@@ -2,6 +2,12 @@
 Changelog
 =========
 
+0.7.27 (2022-11-16)
+===================
+
+Improving `DEV_README.rst`
+(`https://github.com/andersglindstrom/pytest-tcpclient/issues/74`)
+
 0.7.26 (2022-11-16)
 ===================
 
