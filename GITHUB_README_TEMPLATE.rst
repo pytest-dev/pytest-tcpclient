@@ -14,6 +14,15 @@ The ``tcpserver`` fixture is used to express expectations about what messages th
 client sends and also to send replies to it. If any expectation is unfulfilled, the
 test will fail with a diagnostic message.
 
+Contents
+--------
+
+* `Hello <hello_>`_
+* `Test Failure <test_failure_>`_
+* `Development <development_>`_
+
+.. _hello:
+
 Hello!
 ------
 
@@ -26,6 +35,9 @@ Here's the result:
 
 .. include:: examples_output/test_hello.txt
     :code: python
+
+
+.. _test_failure:
 
 Test Failure
 ------------
@@ -42,3 +54,7 @@ message and the test fails.
 Here's the result:
 .. include:: examples_output/test_expect_bytes_times_out.txt
     :code: python
+
+.. _development:
+
+.. include:: DEV_README.rst
