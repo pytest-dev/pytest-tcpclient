@@ -5,17 +5,9 @@ GITHUB_README_HTML := .github/README.html
 
 message = @echo "\033[1;38;5:123m$1\033[0m"
 
-.PHONY: verify_active_venv
-verify_active_venv:
-	$(call message,Checking that virtual environment is active...)
-	@if [ -z "${VIRTUAL_ENV}" ]; then \
-		echo "Virtual environment is not active. Please activate it and try again."; \
-		exit 1; \
-	fi
-
 BUILD_CONFIG := pyproject.toml dev_dependencies.txt
 
-.make/venv_refreshed: $(BUILD_CONFIG) | verify_active_venv
+.make/venv_refreshed: $(BUILD_CONFIG)
 	python -m pip install -e .[dev]
 	mkdir -p ${@D}
 	touch $@
@@ -104,15 +96,19 @@ publish: dist | refresh_env
 html:
 	$(MAKE) -C docs html
 
+# These are the examples that are included in the generated README.rst file
 readme_example_files := \
 	examples/test_hello.py \
 	examples/test_expect_bytes_times_out.py
 
+# Output from the examples is included in the generated README.rst file. These
+# are the file that capture the output of each of those examples.
 readme_example_output_files := \
 	$(patsubst examples/%.py,examples_output/%.txt,$(readme_example_files))
 
 GITHUB_README_INPUT_FILES := \
 	GITHUB_README_TEMPLATE.rst \
+	DEV_README.rst \
 	$(readme_example_files) \
 	$(readme_example_output_files)
 
@@ -134,3 +130,6 @@ examples_output/%.txt: examples/%.py | refresh_env
 
 .PHONY: readme
 readme: $(GITHUB_README_RST)
+
+.PHONY: readmehtml
+readmehtml: $(GITHUB_README_HTML)
