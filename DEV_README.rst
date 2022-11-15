@@ -45,20 +45,31 @@ the tests.
 
 .. code-block:: sh
 
-$ python -m pip install -e .[dev]
+    $ python -m pip install -e .[dev]
 
-Default ``make`` target is `style_and_test`
-+++++++++++++++++++++++++++++++++++++++++++
-
-The default target in the `Makfile` is `style_and_test` which first calls the linter, then
-runs the tests and, finally, checks that code coverage is 100%
-
-`tox`
-+++++
-
-`tox` is only used for CI builds. See `.github/workflows/build`.
-
-`make` detects changes to configuration files
+Default ``make`` target is ``style_and_test``
 +++++++++++++++++++++++++++++++++++++++++++++
 
+The default target in the ``Makfile`` is ``style_and_test`` which first calls
+the linter, then runs the tests and, finally, checks that code coverage is 100%
+
+``tox``
++++++++
+
+``tox` is only used for CI builds. See ``.github/workflows/build.yml``.
+
+``make`` detects changes to configuration files
++++++++++++++++++++++++++++++++++++++++++++++++
+
 If any of the build system configuration files, `make` will reinstall all dependencies.
+
+Continuous Integration and Deployment
++++++++++++++++++++++++++++++++++++++
+
+There is a workflow (``.github/workflows/build.yml``) that will build and test pull
+request with ``tox``.
+
+There is another workflow (``.github/workflows/publish.yml``) that is triggered
+by the appearance of new version tags on the ``main`` branch. It will
+additionally build and test the code and additionally publish the package to
+``pypi``.
