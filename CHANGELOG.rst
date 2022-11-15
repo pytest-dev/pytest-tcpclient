@@ -2,17 +2,24 @@
 Changelog
 =========
 
+0.7.26 (2022-11-16)
+===================
+
+Deleting redundant files
+
+- ``old_dev_dependencies.txt`` (`https://github.com/andersglindstrom/pytest-tcpclient/issues/71`)
+- ``old_examples`` (`https://github.com/andersglindstrom/pytest-tcpclient/issues/72`)
+
 0.7.25 (2022-11-11)
 ===================
 
-Fixed formatting in `CHANGELOG.rst` and `GITHUB_README_TEMPLATE.rst`
+Fixed formatting in ``CHANGELOG.rst`` and ``GITHUB_README_TEMPLATE.rst``
 
 0.7.24 (2022-11-11)
 ===================
 
 Adding ``CHANGELOG.rst``
-
-- Closes ``https://github.com/andersglindstrom/pytest-tcpclient/issues/65``
+(`https://github.com/andersglindstrom/pytest-tcpclient/issues/65`)
 
 0.7.23 (2022-11-11)
 ===================
@@ -20,17 +27,15 @@ Adding ``CHANGELOG.rst``
 Removed ``license.file`` from ``pyproject.toml`` because the license _contents_
 were being included in the ``pypi`` page but we just want the license ``name``.
 The license name is already defined in the Trove classifiers and is now
-reported correctly on ``pypi``.
-
-- Closes ``https://github.com/andersglindstrom/pytest-tcpclient/issues/64``
+reported correctly on ``pypi``
+(`https://github.com/andersglindstrom/pytest-tcpclient/issues/64`).
 
 0.7.22 (2022-10-24)
 ===================
 
 The ``github`` ``build`` workflow used to trigger on ``push`` but now trigger
-on ``pull_request``.
-
-- Closes ``https://github.com/andersglindstrom/pytest-tcpclient/issues/56``
+on ``pull_request``
+(`https://github.com/andersglindstrom/pytest-tcpclient/issues/56`).
 
 0.7.21 (2022-10-24)
 ===================
@@ -43,15 +48,13 @@ Added ``.github/workflows/publish.yml`` that publishes the package when a new ta
 
 Build system config files have been rationalised. In particular, ``setup.cfg`` has been
 removed and all build config now resides in ``pyproject.toml``
-
-- Closes ``https://github.com/andersglindstrom/pytest-tcpclient/issues/47``
+(`https://github.com/andersglindstrom/pytest-tcpclient/issues/4`).
 
 0.7.19 (2022-10-23)
 ===================
 
 ``setuptools_scm`` is now being used to generate package version number
-
-- Closes ``https://github.com/andersglindstrom/pytest-tcpclient/issues/43``
+(`https://github.com/andersglindstrom/pytest-tcpclient/issues/43`).
 
 Added fail-through message to ``plugin.py::interpret_error`` to report uninterpreted
 errors.
