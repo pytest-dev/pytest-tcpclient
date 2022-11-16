@@ -99,7 +99,9 @@ html:
 # These are the examples that are included in the generated README.rst file
 readme_example_files := \
 	examples/test_hello.py \
-	examples/test_expect_bytes_times_out.py
+	examples/test_expect_bytes_times_out.py \
+	examples/test_expect_frame_success.py \
+	examples/test_send_frame_success.py \
 
 # Output from the examples is included in the generated README.rst file. These
 # are the file that capture the output of each of those examples.

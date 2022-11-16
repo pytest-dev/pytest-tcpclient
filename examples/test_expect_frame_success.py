@@ -1,20 +1,27 @@
 import asyncio
 import pytest
-
-from pytest_tcpclient.framing import write_frame
+import struct
 
 
 @pytest.mark.asyncio()
 async def test_expect_frame_success(tcpserver):
 
     tcpserver.expect_connect()
-    tcpserver.expect_bytes(b"Hello, world")
     tcpserver.expect_frame(b"Goodbye, world")
 
     reader, writer = await asyncio.open_connection(None, tcpserver.service_port)
-    writer.write(b"Hello, world")
-    write_frame(writer, b"Goodbye, world")
+
+    payload = b"Goodbye, world"
+
+    # Here's the 4-byte length header
+    writer.write(struct.pack(">I", len(payload)))
+
+    # Here's the payload
+    writer.write(payload)
+
+    # Done
     writer.close()
+
     await writer.wait_closed()
 
     await tcpserver.join()

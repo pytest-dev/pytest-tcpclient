@@ -19,6 +19,7 @@ Contents
 
 * `Hello <hello_>`_
 * `Test Failure <test_failure_>`_
+* `Sending and receiving length-delimited "frames" <framing_>`_
 * `Development <development_>`_
 
 .. _hello:
@@ -53,6 +54,37 @@ message and the test fails.
 
 Here's the result:
 .. include:: examples_output/test_expect_bytes_times_out.txt
+    :code: python
+
+.. _framing:
+
+Sending and receiving length-delimited "frames"
+-----------------------------------------------
+
+A common pattern for TCP communication is to send and receive discrete messages. One
+way to represent the boundaries of these messages is to prepend a 4-byte binary
+integer in network (big-endian) ordering that is the length of the payload. In
+``pytest-tcpclient`` this convention is called "framing".
+
+Here's an example of testing that a client sends a frame (``expect_frame``):
+
+.. include:: examples/test_expect_frame_success.py
+    :code: python
+
+Here's the result:
+
+.. include:: examples_output/test_expect_frame_success.txt
+    :code: python
+
+Here's an example where the server sends a frame (``send_frame``) and the client
+receives it:
+
+.. include:: examples/test_send_frame_success.py
+    :code: python
+
+Here's the result:
+
+.. include:: examples_output/test_send_frame_success.txt
     :code: python
 
 .. _development:
