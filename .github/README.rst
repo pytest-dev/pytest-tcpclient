@@ -299,23 +299,23 @@ That will do the following:
 Build configuration
 +++++++++++++++++++
 
-As much as possible build configuration is stored in `pyproject.toml`. There are two
-exceptions to this.
+Build configuration is mostly stored in ``pyproject.toml``. Idealy, it would all be in
+there. However, there are two exceptions.
 
-First, `setuptools` has been chosen as the build system. Unfortunately, to install
-`pytest-tcpclient` in editable mode, a minimial `setup.py` must be and has been provided.
+First, ``setuptools`` has been chosen as the build system. Unfortunately, to install
+``pytest-tcpclient`` in editable mode, a minimial ``setup.py`` must be and has been provided.
 
-Packages that `pytest-tcpclient` requires to run are listed in `pyproject.toml`.
+Packages that ``pytest-tcpclient`` requires to run are listed in ``pyproject.toml``.
 
 Packages required for development (testing, coverage and linting) are listed in
-`dev_dependencies.txt`.
+``dev_dependencies.txt``.
 
-`tox` has been configured (in `tox.ini`) to install those packages before running
+``tox`` has been configured (in ``tox.ini``) to install those packages before running
 the tests.
 
- `setuptools` has been configured to supply the option `dev` for those extra packages.
- For example, the `Makefile` has the following command to initialise the virtual
- environment:
+``setuptools`` has been configured to supply the option ``dev`` for those extra packages.
+For example, the ``Makefile`` has the following command to initialise the virtual
+environment:
 
 .. code-block:: sh
 
@@ -330,21 +330,21 @@ the linter, then runs the tests and, finally, checks that code coverage is 100%
 ``tox``
 +++++++
 
-``tox` is only used for CI builds. See ``.github/workflows/build.yml``.
+``tox`` is only used for CI builds. See ``.github/workflows/build.yml``.
 
 ``make`` detects changes to configuration files
 +++++++++++++++++++++++++++++++++++++++++++++++
 
-If any of the build system configuration files, `make` will reinstall all dependencies.
+If any of the build system configuration files, ``make`` will reinstall all dependencies.
 
 Continuous Integration and Deployment
 +++++++++++++++++++++++++++++++++++++
 
 There is a workflow (``.github/workflows/build.yml``) that will build and test pull
-request with ``tox``.
+requests with ``tox``.
 
 There is another workflow (``.github/workflows/publish.yml``) that is triggered
 by the appearance of new version tags on the ``main`` branch. It will
-additionally build and test the code and additionally publish the package to
+build and test the code and additionally publish the package to
 ``pypi``.
 
