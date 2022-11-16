@@ -2,6 +2,12 @@
 Changelog
 =========
 
+0.7.28 (2022-11-16)
+===================
+
+`GITHUB_README_TEMPLATE.rst` now includes doc for "framing"
+(`https://github.com/andersglindstrom/pytest-tcpclient/issues/66`).
+
 0.7.27 (2022-11-16)
 ===================
 
